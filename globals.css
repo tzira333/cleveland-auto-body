@@ -1,0 +1,121 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  /* Flag color palette */
+  --red: 128, 0, 0;
+  --white: 255, 255, 255;
+  --blue: 29, 78, 137;
+  --background: var(--white);
+  --foreground: 20, 20, 20;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: 20, 20, 20;
+    --foreground: var(--white);
+  }
+}
+
+body {
+  color: rgb(var(--foreground));
+  background: rgb(var(--background));
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+  
+  /* Fade-in animation for tooltip */
+  .animate-fadeIn {
+    animation: fadeIn 0.2s ease-in-out;
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(-5px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+}
+
+/* Button styles */
+.btn-flag-red {
+  @apply bg-red-600 hover:bg-red-700 text-white font-semibold py-2 px-4 rounded transition-colors;
+}
+
+.btn-flag-white {
+  @apply bg-white hover:bg-gray-100 text-red-600 font-semibold py-2 px-4 rounded border-2 border-red-600 transition-colors;
+}
+
+.btn-flag-blue {
+  @apply bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded transition-colors;
+}
+
+/* ============================================ */
+/* FIX: Force dark text color in all form inputs */
+/* ============================================ */
+input,
+textarea,
+select {
+  color: #1f2937 !important; /* gray-800 - dark gray text */
+  background-color: #ffffff !important; /* white background */
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: #9ca3af !important; /* gray-400 - lighter gray for placeholders */
+  opacity: 1 !important;
+}
+
+/* Ensure text is visible when autofill */
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus,
+input:-webkit-autofill:active,
+textarea:-webkit-autofill,
+textarea:-webkit-autofill:hover,
+textarea:-webkit-autofill:focus,
+textarea:-webkit-autofill:active,
+select:-webkit-autofill,
+select:-webkit-autofill:hover,
+select:-webkit-autofill:focus,
+select:-webkit-autofill:active {
+  -webkit-text-fill-color: #1f2937 !important;
+  -webkit-box-shadow: 0 0 0px 1000px #ffffff inset !important;
+  box-shadow: 0 0 0px 1000px #ffffff inset !important;
+  transition: background-color 5000s ease-in-out 0s;
+}
+
+/* Dark mode support - keep text dark even in dark mode for form inputs */
+@media (prefers-color-scheme: dark) {
+  input,
+  textarea,
+  select {
+    color: #1f2937 !important;
+    background-color: #ffffff !important;
+  }
+}
+
+/* Print styles */
+@media print {
+  body {
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+  
+  .no-print {
+    display: none !important;
+  }
+}

@@ -1,0 +1,299 @@
+'use client'
+
+import { useState, useEffect } from 'react'
+import { createBrowserClient } from '@supabase/ssr'
+import { useRouter } from 'next/navigation'
+
+type ViewType = 'dashboard' | 'repair-orders' | 'customers' | 'parts' | 'reports'
+
+interface RepairOrder {
+  id: string
+  ro_number: string
+  status: string
+  priority: string
+  date_received: string
+  estimated_completion: string
+  customer_id: string
+  vehicle_id: string
+  damage_description: string
+}
+
+export default function CRMDashboard() {
+  const router = useRouter()
+  const [currentView, setCurrentView] = useState<ViewType>('dashboard')
+  const [repairOrders, setRepairOrders] = useState<RepairOrder[]>([])
+  const [loading, setLoading] = useState(true)
+
+  const supabase = createBrowserClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  )
+
+  useEffect(() => {
+    loadData()
+  }, [])
+
+  const loadData = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('crm_repair_orders')
+        .select('*')
+        .order('date_received', { ascending: false })
+
+      if (error) throw error
+      setRepairOrders(data || [])
+    } catch (error) {
+      console.error('Error loading data:', error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleLogout = async () => {
+    await supabase.auth.signOut()
+    router.push('/admin/staff/login')
+  }
+
+  const getStatusColor = (status: string) => {
+    const colors: Record<string, string> = {
+      intake: 'bg-blue-100 text-blue-800',
+      insurance: 'bg-purple-100 text-purple-800',
+      estimate_approval: 'bg-orange-100 text-orange-800',
+      blueprinting: 'bg-teal-100 text-teal-800',
+      parts_ordered: 'bg-yellow-100 text-yellow-800',
+      in_repair: 'bg-indigo-100 text-indigo-800',
+      painting: 'bg-pink-100 text-pink-800',
+      quality_control: 'bg-red-100 text-red-800',
+      ready_pickup: 'bg-green-100 text-green-800',
+      completed: 'bg-gray-100 text-gray-800'
+    }
+    return colors[status] || 'bg-gray-100 text-gray-800'
+  }
+
+  const getPriorityColor = (priority: string) => {
+    const colors: Record<string, string> = {
+      low: 'text-green-600',
+      medium: 'text-blue-600',
+      high: 'text-orange-600',
+      urgent: 'text-red-600'
+    }
+    return colors[priority] || 'text-gray-600'
+  }
+
+  const statusCounts = {
+    active: repairOrders.filter(ro => ro.status !== 'completed').length,
+    overdue: repairOrders.filter(ro => ro.estimated_completion && new Date(ro.estimated_completion) < new Date() && ro.status !== 'completed').length,
+    ready: repairOrders.filter(ro => ro.status === 'ready_pickup').length
+  }
+
+  return (
+    <div className="min-h-screen bg-gray-50">
+      {/* Header */}
+      <header className="bg-white shadow-sm border-b">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+          <div className="flex justify-between items-center">
+            <div className="flex items-center space-x-4">
+              <button
+                onClick={() => router.push('/admin/staff')}
+                className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                title="Back to Portal"
+              >
+                <svg className="w-6 h-6 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+                </svg>
+              </button>
+              <div>
+                <h1 className="text-2xl font-bold text-gray-900">
+                  BodyShop CRM - Workflow Management
+                </h1>
+                <p className="text-sm text-gray-600 mt-1">
+                  Complete repair tracking system
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={handleLogout}
+              className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors text-sm font-medium"
+            >
+              Logout
+            </button>
+          </div>
+        </div>
+      </header>
+
+      {/* Navigation */}
+      <nav className="bg-white border-b">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex space-x-8">
+            {[
+              { id: 'dashboard' as ViewType, label: 'Dashboard', icon: '📊' },
+              { id: 'repair-orders' as ViewType, label: 'Repair Orders', icon: '📋' },
+              { id: 'customers' as ViewType, label: 'Customers', icon: '👥' },
+              { id: 'parts' as ViewType, label: 'Parts', icon: '📦' },
+              { id: 'reports' as ViewType, label: 'Reports', icon: '📈' }
+            ].map((item) => (
+              <button
+                key={item.id}
+                onClick={() => setCurrentView(item.id)}
+                className={`py-4 px-2 border-b-2 font-medium text-sm transition-colors ${
+                  currentView === item.id
+                    ? 'border-blue-500 text-blue-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                }`}
+              >
+                <span className="mr-2">{item.icon}</span>
+                {item.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      </nav>
+
+      {/* Main Content */}
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {currentView === 'dashboard' && (
+          <div>
+            {/* Stats Cards */}
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+              <div className="bg-white p-6 rounded-lg shadow">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-gray-600">Active Repairs</p>
+                    <p className="text-3xl font-bold text-gray-900 mt-2">{statusCounts.active}</p>
+                  </div>
+                  <div className="bg-blue-100 p-3 rounded-full">
+                    <svg className="w-8 h-8 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                    </svg>
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-white p-6 rounded-lg shadow">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-gray-600">Overdue</p>
+                    <p className="text-3xl font-bold text-red-600 mt-2">{statusCounts.overdue}</p>
+                  </div>
+                  <div className="bg-red-100 p-3 rounded-full">
+                    <svg className="w-8 h-8 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-white p-6 rounded-lg shadow">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-gray-600">Ready for Pickup</p>
+                    <p className="text-3xl font-bold text-green-600 mt-2">{statusCounts.ready}</p>
+                  </div>
+                  <div className="bg-green-100 p-3 rounded-full">
+                    <svg className="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-white p-6 rounded-lg shadow">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-gray-600">Total Orders</p>
+                    <p className="text-3xl font-bold text-gray-900 mt-2">{repairOrders.length}</p>
+                  </div>
+                  <div className="bg-purple-100 p-3 rounded-full">
+                    <svg className="w-8 h-8 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                    </svg>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Recent Repair Orders */}
+            <div className="bg-white rounded-lg shadow">
+              <div className="px-6 py-4 border-b">
+                <h2 className="text-lg font-semibold text-gray-900">Recent Repair Orders</h2>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">RO#</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Priority</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date Received</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Est. Completion</th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {loading ? (
+                      <tr>
+                        <td colSpan={5} className="px-6 py-8 text-center text-gray-500">
+                          Loading...
+                        </td>
+                      </tr>
+                    ) : repairOrders.length === 0 ? (
+                      <tr>
+                        <td colSpan={5} className="px-6 py-8 text-center text-gray-500">
+                          No repair orders yet. Create your first repair order to get started.
+                        </td>
+                      </tr>
+                    ) : (
+                      repairOrders.slice(0, 10).map((ro) => (
+                        <tr key={ro.id} className="hover:bg-gray-50">
+                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                            {ro.ro_number}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <span className={`px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(ro.status)}`}>
+                              {ro.status.replace(/_/g, ' ').toUpperCase()}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <span className={`text-sm font-medium ${getPriorityColor(ro.priority)}`}>
+                              {ro.priority.toUpperCase()}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            {new Date(ro.date_received).toLocaleDateString()}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            {ro.estimated_completion
+                              ? new Date(ro.estimated_completion).toLocaleDateString()
+                              : 'Not set'}
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {currentView !== 'dashboard' && (
+          <div className="bg-white rounded-lg shadow p-12">
+            <div className="text-center text-gray-500">
+              <svg className="w-24 h-24 mx-auto text-gray-300 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
+              </svg>
+              <h3 className="text-xl font-semibold text-gray-900 mb-2">
+                {currentView.charAt(0).toUpperCase() + currentView.slice(1).replace(/-/g, ' ')} View
+              </h3>
+              <p className="text-gray-600 mb-4">
+                This section is ready for implementation. The full CRM features will be built out based on your specific workflow needs.
+              </p>
+              <p className="text-sm text-gray-500">
+                Available features: Customer Management, Vehicle Tracking, Parts Inventory, Time Tracking, Documents, and Reports
+              </p>
+            </div>
+          </div>
+        )}
+      </main>
+    </div>
+  )
+}

@@ -1,0 +1,11 @@
+# Allow all search engines
+User-agent: *
+Allow: /
+
+# Block admin areas
+Disallow: /admin
+Disallow: /portal
+Disallow: /api
+
+# Sitemap
+Sitemap: https://clevelandbody.com/sitemap.xml
