@@ -13,6 +13,24 @@ Staff members authenticate once and can access both systems through a unified po
 
 ## ✨ Key Features
 
+### Homepage Gallery Banner Slideshow 🎨
+- **Auto-Looping Carousel**: Showcases work from gallery with smooth transitions
+- **5-Image Display**: Shows current image plus 2 on each side with depth effect
+- **Auto-Advance**: Automatically advances every 4 seconds
+- **Manual Navigation**: Left/right arrow buttons and dot indicators
+- **Interactive**: Click any visible image to jump to it
+- **Responsive Design**: Optimized for all screen sizes
+- **Direct Link**: "View Full Gallery" button links to complete gallery page
+- **Strategic Placement**: Between CTA buttons and footer for maximum visibility
+
+### Customer Portal Authentication 🔐
+- **Secure Registration**: Customer accounts with email/password authentication
+- **Phone-Based Lookup**: Find appointments using phone number
+- **Personal Dashboard**: View all appointments and upload files
+- **File Uploads**: Upload photos and documents for specific appointments
+- **Auto-Scroll Results**: Search results automatically scroll into view
+- **Row-Level Security**: Database-level protection of customer data
+
 ### Staff Portal Authentication
 - **Unified Login**: Single sign-on for all staff members
 - **Role-Based Access**: Configurable access to Appointments and/or CRM
