@@ -73,6 +73,7 @@ export default function CustomerRegister() {
             full_name: fullName,
             phone: normalizedPhone,
           },
+          emailRedirectTo: `${window.location.origin}/portal/auth/login`,
         },
       })
 

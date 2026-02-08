@@ -2,6 +2,7 @@
 
 import Link from 'next/link'
 import { useState } from 'react'
+import GalleryBanner from './GalleryBanner'
 
 export default function Hero() {
   const [showTooltip, setShowTooltip] = useState(false)
@@ -106,7 +107,10 @@ export default function Hero() {
         </div>
       </div>
 
-      {/* Wave Divider: White to Blue */}
+      {/* Gallery Banner Slideshow - Replaces the X marker location */}
+      <GalleryBanner />
+
+      {/* Wave Divider: Dark to Blue */}
       <div className="relative h-16 bg-blue-900">
         <svg
           className="absolute top-0 w-full h-16"
@@ -116,7 +120,7 @@ export default function Hero() {
         >
           <path
             d="M0,50 C240,0 480,100 720,50 C960,0 1200,100 1440,50 L1440,0 L0,0 Z"
-            fill="#ffffff"
+            fill="#1f2937"
           />
         </svg>
       </div>
