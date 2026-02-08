@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { createBrowserClient } from '@supabase/ssr'
 import { useRouter } from 'next/navigation'
+import ConvertToROButton from './appointments/ConvertToROButton'
 
 interface Appointment {
   id: string
@@ -272,12 +273,21 @@ export default function StaffDashboard() {
                         </span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm">
-                        <button
-                          onClick={() => setSelectedAppointment(appointment)}
-                          className="text-blue-600 hover:text-blue-900 font-medium"
-                        >
-                          View Details
-                        </button>
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => setSelectedAppointment(appointment)}
+                            className="text-blue-600 hover:text-blue-900 font-medium"
+                          >
+                            View Details
+                          </button>
+                          {appointment.status === 'completed' && (
+                            <ConvertToROButton 
+                              appointmentId={appointment.id}
+                              appointmentStatus={appointment.status}
+                              onSuccess={fetchAppointments}
+                            />
+                          )}
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -378,10 +388,20 @@ export default function StaffDashboard() {
               </div>
             </div>
 
-            <div className="p-6 border-t border-gray-200 flex justify-end">
+            <div className="p-6 border-t border-gray-200 flex justify-between items-center">
+              {selectedAppointment.status === 'completed' && (
+                <ConvertToROButton 
+                  appointmentId={selectedAppointment.id}
+                  appointmentStatus={selectedAppointment.status}
+                  onSuccess={() => {
+                    fetchAppointments()
+                    setSelectedAppointment(null)
+                  }}
+                />
+              )}
               <button
                 onClick={() => setSelectedAppointment(null)}
-                className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors"
+                className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors ml-auto"
               >
                 Close
               </button>
