@@ -198,16 +198,37 @@ export async function POST(request: NextRequest) {
     }
 
     // 3. Generate RO number
+    let roNumber: string
+    
+    // Try to use the database function first
     const { data: roNumberData, error: roNumberError } = await supabase
       .rpc('generate_ro_number')
 
-    if (roNumberError) {
-      console.error('Error generating RO number:', roNumberError)
-      // Fallback to timestamp-based number
-      const roNumber = `RO-${Date.now()}`
+    if (roNumberError || !roNumberData) {
+      // Fallback: Generate RO number manually
+      console.log('RPC function failed, using fallback RO number generation:', roNumberError)
+      
+      // Get the highest existing RO number
+      const { data: existingROs } = await supabase
+        .from('crm_repair_orders')
+        .select('ro_number')
+        .ilike('ro_number', 'RO-%')
+        .order('ro_number', { ascending: false })
+        .limit(1)
+      
+      let nextNumber = 1
+      if (existingROs && existingROs.length > 0) {
+        const lastRO = existingROs[0].ro_number
+        const match = lastRO.match(/RO-(\d+)/)
+        if (match) {
+          nextNumber = parseInt(match[1], 10) + 1
+        }
+      }
+      
+      roNumber = `RO-${String(nextNumber).padStart(5, '0')}`
+    } else {
+      roNumber = roNumberData
     }
-
-    const roNumber = roNumberData || `RO-${Date.now()}`
 
     // 4. Calculate planned completion date if start date and duration provided
     let plannedCompletionDate = null
