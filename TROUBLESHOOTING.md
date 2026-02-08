@@ -132,7 +132,23 @@ Quick lookup by phone number returns no results even though appointments exist.
 
 ### Solutions
 
-#### Solution 1: Check Phone Number Format in Database
+#### Solution 1: RLS Blocking Direct Queries (FIXED IN LATEST VERSION)
+**Status**: ✅ Fixed in commit dbcff2d
+
+The customer portal now uses the API endpoint instead of direct Supabase queries:
+- API uses service role key (bypasses RLS)
+- Properly handles phone normalization
+- Returns results correctly
+
+**If using old version**: Pull latest code from git:
+```bash
+cd /home/user/webapp
+git pull origin main
+npm install
+npm run build
+```
+
+#### Solution 2: Check Phone Number Format in Database
 
 ```sql
 -- Check how phone is stored
