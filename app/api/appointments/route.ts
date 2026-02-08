@@ -4,7 +4,12 @@ import { NextRequest, NextResponse } from 'next/server';
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 
-const supabase = createClient(supabaseUrl, supabaseServiceKey);
+const supabase = createClient(supabaseUrl, supabaseServiceKey, {
+  auth: {
+    autoRefreshToken: false,
+    persistSession: false
+  }
+});
 
 // Modern Next.js 14 configuration
 export const runtime = 'nodejs';
@@ -16,23 +21,47 @@ export async function POST(request: NextRequest) {
 
     // Extract form fields
     const customer_name = formData.get('customer_name') as string;
-    const customer_phone = formData.get('customer_phone') as string;
-    const customer_email = formData.get('customer_email') as string;
+    let customer_phone = formData.get('customer_phone') as string;
+    const customer_email = formData.get('customer_email') as string || '';
     const service_type = formData.get('service_type') as string;
-    const vehicle_info = formData.get('vehicle_info') as string;
-    const damage_description = formData.get('damage_description') as string;
-    const appointment_date = formData.get('appointment_date') as string;
-    const appointment_time = formData.get('appointment_time') as string;
+    const vehicle_info = formData.get('vehicle_info') as string || '';
+    const damage_description = formData.get('damage_description') as string || '';
+    const appointment_date = formData.get('appointment_date') as string || '';
+    const appointment_time = formData.get('appointment_time') as string || '';
     const status = formData.get('status') as string || 'pending';
     const file_count = parseInt(formData.get('file_count') as string || '0');
 
+    // Normalize phone number (remove all non-digits)
+    if (customer_phone) {
+      customer_phone = customer_phone.replace(/\D/g, '');
+    }
+
     // Validate required fields
-    if (!customer_name || !customer_phone || !service_type || !vehicle_info) {
+    if (!customer_name || !customer_phone || !service_type) {
       return NextResponse.json(
-        { error: 'Missing required fields' },
+        { error: 'Missing required fields: name, phone, and service type are required' },
         { status: 400 }
       );
     }
+
+    // Validate phone is 10 digits
+    if (customer_phone.length !== 10) {
+      return NextResponse.json(
+        { error: 'Phone number must be 10 digits' },
+        { status: 400 }
+      );
+    }
+
+    console.log('Creating appointment with data:', {
+      customer_name,
+      customer_phone,
+      customer_email,
+      service_type,
+      vehicle_info,
+      appointment_date,
+      appointment_time,
+      status
+    });
 
     // Insert appointment record
     const { data: appointment, error: appointmentError } = await supabase
@@ -56,7 +85,10 @@ export async function POST(request: NextRequest) {
     if (appointmentError) {
       console.error('Appointment insert error:', appointmentError);
       return NextResponse.json(
-        { error: 'Failed to create appointment' },
+        { 
+          error: 'Failed to create appointment',
+          details: appointmentError.message 
+        },
         { status: 500 }
       );
     }
@@ -80,44 +112,52 @@ export async function POST(request: NextRequest) {
           const arrayBuffer = await file.arrayBuffer();
           const buffer = Buffer.from(arrayBuffer);
 
-          // Upload to Supabase Storage
-          const { data: uploadData, error: uploadError } = await supabase.storage
-            .from('appointment-files')
-            .upload(fileName, buffer, {
-              contentType: file.type,
-              upsert: false,
-            });
+          // Upload to Supabase Storage (if bucket exists)
+          try {
+            const { data: uploadData, error: uploadError } = await supabase.storage
+              .from('appointment-files')
+              .upload(fileName, buffer, {
+                contentType: file.type,
+                upsert: false,
+              });
 
-          if (uploadError) {
-            console.error('File upload error:', uploadError);
-            continue;
-          }
+            if (uploadError) {
+              console.error('File upload error:', uploadError);
+              continue;
+            }
 
-          // Get public URL
-          const { data: urlData } = supabase.storage
-            .from('appointment-files')
-            .getPublicUrl(fileName);
+            // Get public URL
+            const { data: urlData } = supabase.storage
+              .from('appointment-files')
+              .getPublicUrl(fileName);
 
-          // Store file metadata in database
-          const { data: fileRecord, error: fileError } = await supabase
-            .from('appointment_files')
-            .insert([
-              {
-                appointment_id: appointmentId,
-                file_name: file.name,
-                file_type: file.type,
-                file_size: file.size,
-                storage_path: fileName,
-                public_url: urlData.publicUrl,
-              },
-            ])
-            .select()
-            .single();
+            // Store file metadata in database (if table exists)
+            try {
+              const { data: fileRecord, error: fileError } = await supabase
+                .from('appointment_files')
+                .insert([
+                  {
+                    appointment_id: appointmentId,
+                    file_name: file.name,
+                    file_type: file.type,
+                    file_size: file.size,
+                    storage_path: fileName,
+                    public_url: urlData.publicUrl,
+                  },
+                ])
+                .select()
+                .single();
 
-          if (fileError) {
-            console.error('File metadata insert error:', fileError);
-          } else {
-            uploadedFiles.push(fileRecord);
+              if (fileError) {
+                console.error('File metadata insert error:', fileError);
+              } else {
+                uploadedFiles.push(fileRecord);
+              }
+            } catch (metadataError) {
+              console.error('File metadata error (table may not exist):', metadataError);
+            }
+          } catch (storageError) {
+            console.error('Storage error (bucket may not exist):', storageError);
           }
         } catch (fileError) {
           console.error(`Error processing file ${i}:`, fileError);
@@ -134,7 +174,7 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error('API error:', error);
     return NextResponse.json(
-      { error: 'Internal server error' },
+      { error: 'Internal server error', details: error instanceof Error ? error.message : 'Unknown error' },
       { status: 500 }
     );
   }
@@ -158,24 +198,14 @@ export async function GET(request: NextRequest) {
     // Query appointments by phone
     const { data: appointments, error } = await supabase
       .from('appointments')
-      .select(`
-        *,
-        appointment_files (
-          id,
-          file_name,
-          file_type,
-          file_size,
-          public_url,
-          created_at
-        )
-      `)
-      .or(`customer_phone.eq.${phone},customer_phone.eq.${normalizedPhone}`)
+      .select('*')
+      .eq('customer_phone', normalizedPhone)
       .order('created_at', { ascending: false });
 
     if (error) {
       console.error('Query error:', error);
       return NextResponse.json(
-        { error: 'Failed to fetch appointments' },
+        { error: 'Failed to fetch appointments', details: error.message },
         { status: 500 }
       );
     }
@@ -184,7 +214,7 @@ export async function GET(request: NextRequest) {
   } catch (error) {
     console.error('API error:', error);
     return NextResponse.json(
-      { error: 'Internal server error' },
+      { error: 'Internal server error', details: error instanceof Error ? error.message : 'Unknown error' },
       { status: 500 }
     );
   }
