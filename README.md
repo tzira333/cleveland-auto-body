@@ -48,9 +48,13 @@ Staff members authenticate once and can access both systems through a unified po
 - **Repair Orders**: Complete lifecycle management with 9 workflow stages:
   - Intake → Insurance → Estimate Approval → Blueprinting
   - Parts Ordered → In Repair → Painting → Quality Control → Ready for Pickup
+- **Automated RO Creation**: Convert completed appointments to repair orders with one click
+- **Manual RO Creation**: Comprehensive form for walk-in customers
+- **Complete Data Capture**: Customer, vehicle, insurance, parts, costs, timeline
+- **Auto-Save**: Customer and vehicle data automatically saved for future reference
+- **Parts Management**: Required parts list with quantities and estimated costs
 - **Customer Management**: Complete customer database with insurance tracking
 - **Vehicle Management**: Vehicle information and history
-- **Parts Management**: Order tracking, supplier management, delivery status
 - **Time Tracking**: Labor hours and cost tracking by technician
 - **Documents**: Photo and document management for each repair order
 - **Reports**: Analytics and bottleneck analysis
