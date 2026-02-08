@@ -1,12 +1,8 @@
 'use client'
 
 import { useState, FormEvent, ChangeEvent } from 'react'
-import { createClient } from '@supabase/supabase-js'
 import { normalizePhone, formatPhoneDisplay } from '@/lib/utils/phone'
 import Link from 'next/link'
-
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 
 interface Appointment {
   id: string
@@ -30,8 +26,6 @@ export default function CustomerPortal() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [searched, setSearched] = useState(false)
-
-  const supabase = createClient(supabaseUrl, supabaseAnonKey)
 
   const handlePhoneChange = (e: ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value
@@ -70,15 +64,15 @@ export default function CustomerPortal() {
     }
 
     try {
-      const { data, error: queryError } = await supabase
-        .from('appointments')
-        .select('*')
-        .eq('customer_phone', normalizedPhone)
-        .order('created_at', { ascending: false })
+      // Use API endpoint instead of direct Supabase query to bypass RLS
+      const response = await fetch(`/api/appointments?phone=${encodeURIComponent(normalizedPhone)}`)
+      
+      if (!response.ok) {
+        throw new Error('Failed to fetch appointments')
+      }
 
-      if (queryError) throw queryError
-
-      setAppointments(data || [])
+      const result = await response.json()
+      setAppointments(result.appointments || [])
     } catch (err: any) {
       setError('Failed to retrieve appointments. Please try again.')
       console.error('Error fetching appointments:', err)
