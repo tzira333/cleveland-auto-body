@@ -3,6 +3,7 @@
 import { useState, FormEvent, ChangeEvent } from 'react'
 import { createClient } from '@supabase/supabase-js'
 import { normalizePhone, formatPhoneDisplay } from '@/lib/utils/phone'
+import Link from 'next/link'
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
@@ -116,11 +117,26 @@ export default function CustomerPortal() {
         <div className="bg-white rounded-lg shadow-xl p-8 mb-8">
           <div className="text-center mb-6">
             <h1 className="text-4xl font-bold text-gray-900 mb-2">
-              Customer Portal
+              Customer Portal - Quick Lookup
             </h1>
-            <p className="text-gray-600">
-              View your appointment status and details
+            <p className="text-gray-600 mb-4">
+              View your appointment status by phone number
             </p>
+            <div className="flex justify-center gap-4 text-sm">
+              <Link
+                href="/portal/auth/login"
+                className="text-red-600 font-semibold hover:underline"
+              >
+                🔐 Login to Your Account
+              </Link>
+              <span className="text-gray-400">|</span>
+              <Link
+                href="/portal/auth/register"
+                className="text-blue-600 font-semibold hover:underline"
+              >
+                ✨ Create an Account
+              </Link>
+            </div>
           </div>
 
           {/* Search Form */}
@@ -182,6 +198,14 @@ export default function CustomerPortal() {
               </a>
             </p>
             <p className="mt-1">17017 Saint Clair Ave, Cleveland, OH 44110</p>
+            <div className="mt-4 bg-blue-50 rounded-lg p-4">
+              <p className="text-blue-800 font-semibold mb-2">
+                💡 Pro Tip: Create an account for easier access!
+              </p>
+              <p className="text-blue-700 text-xs">
+                With an account, you can view all your appointments instantly without entering your phone number each time.
+              </p>
+            </div>
           </div>
         </div>
 
