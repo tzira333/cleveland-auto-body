@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, FormEvent, ChangeEvent } from 'react'
+import { useState, FormEvent, ChangeEvent, useRef, useEffect } from 'react'
 import { normalizePhone, formatPhoneDisplay } from '@/lib/utils/phone'
 import Link from 'next/link'
 
@@ -20,12 +20,29 @@ interface Appointment {
   created_at: string
 }
 
+interface UploadedFile {
+  file: File
+  preview?: string
+  appointmentId?: string
+}
+
 export default function CustomerPortal() {
   const [phone, setPhone] = useState('')
   const [appointments, setAppointments] = useState<Appointment[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [searched, setSearched] = useState(false)
+  const [uploadingFiles, setUploadingFiles] = useState<Record<string, boolean>>({})
+  const [uploadedFiles, setUploadedFiles] = useState<Record<string, UploadedFile[]>>({})
+  const [uploadError, setUploadError] = useState<Record<string, string>>({})
+  const resultsRef = useRef<HTMLDivElement>(null)
+
+  // Auto-scroll to results when appointments are loaded
+  useEffect(() => {
+    if (searched && appointments.length > 0 && resultsRef.current) {
+      resultsRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    }
+  }, [appointments, searched])
 
   const handlePhoneChange = (e: ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value
@@ -78,6 +95,127 @@ export default function CustomerPortal() {
       console.error('Error fetching appointments:', err)
     } finally {
       setLoading(false)
+    }
+  }
+
+  const handleFileSelect = (appointmentId: string, e: ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files
+    if (!files || files.length === 0) return
+
+    setUploadError(prev => ({ ...prev, [appointmentId]: '' }))
+
+    const maxSize = 10 * 1024 * 1024 // 10MB per file
+    const maxFiles = 10
+    const allowedTypes = [
+      'image/jpeg',
+      'image/png',
+      'image/jpg',
+      'image/gif',
+      'image/webp',
+      'application/pdf',
+    ]
+
+    const currentFiles = uploadedFiles[appointmentId] || []
+    const newFiles: UploadedFile[] = []
+
+    if (currentFiles.length + files.length > maxFiles) {
+      setUploadError(prev => ({ 
+        ...prev, 
+        [appointmentId]: `Maximum ${maxFiles} files allowed` 
+      }))
+      return
+    }
+
+    Array.from(files).forEach((file) => {
+      if (file.size > maxSize) {
+        setUploadError(prev => ({ 
+          ...prev, 
+          [appointmentId]: `File ${file.name} exceeds 10MB limit` 
+        }))
+        return
+      }
+
+      if (!allowedTypes.includes(file.type)) {
+        setUploadError(prev => ({ 
+          ...prev, 
+          [appointmentId]: `File ${file.name} type not supported` 
+        }))
+        return
+      }
+
+      // Create preview for images
+      let preview: string | undefined
+      if (file.type.startsWith('image/')) {
+        preview = URL.createObjectURL(file)
+      }
+
+      newFiles.push({ file, preview, appointmentId })
+    })
+
+    setUploadedFiles(prev => ({
+      ...prev,
+      [appointmentId]: [...currentFiles, ...newFiles]
+    }))
+
+    // Reset input
+    e.target.value = ''
+  }
+
+  const removeFile = (appointmentId: string, index: number) => {
+    setUploadedFiles(prev => {
+      const files = prev[appointmentId] || []
+      // Revoke preview URL if it exists
+      if (files[index]?.preview) {
+        URL.revokeObjectURL(files[index].preview!)
+      }
+      return {
+        ...prev,
+        [appointmentId]: files.filter((_, i) => i !== index)
+      }
+    })
+    setUploadError(prev => ({ ...prev, [appointmentId]: '' }))
+  }
+
+  const uploadFiles = async (appointmentId: string) => {
+    const files = uploadedFiles[appointmentId]
+    if (!files || files.length === 0) return
+
+    setUploadingFiles(prev => ({ ...prev, [appointmentId]: true }))
+    setUploadError(prev => ({ ...prev, [appointmentId]: '' }))
+
+    try {
+      const formData = new FormData()
+      formData.append('appointment_id', appointmentId)
+      files.forEach((uploadedFile, index) => {
+        formData.append(`file_${index}`, uploadedFile.file)
+      })
+      formData.append('file_count', files.length.toString())
+
+      const response = await fetch('/api/appointments/upload', {
+        method: 'POST',
+        body: formData,
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || 'Upload failed')
+      }
+
+      const result = await response.json()
+      
+      // Clear uploaded files for this appointment
+      setUploadedFiles(prev => ({ ...prev, [appointmentId]: [] }))
+      
+      // Show success message
+      alert(`Successfully uploaded ${files.length} file(s)!`)
+    } catch (err: any) {
+      console.error('Upload error:', err)
+      setUploadError(prev => ({ 
+        ...prev, 
+        [appointmentId]: err.message || 'Failed to upload files. Please try again.' 
+      }))
+    } finally {
+      setUploadingFiles(prev => ({ ...prev, [appointmentId]: false }))
     }
   }
 
@@ -205,7 +343,7 @@ export default function CustomerPortal() {
 
         {/* Results */}
         {searched && (
-          <div className="space-y-4">
+          <div ref={resultsRef} className="space-y-4 scroll-mt-4">
             {appointments.length === 0 ? (
               <div className="bg-white rounded-lg shadow-lg p-12 text-center">
                 <div className="text-6xl mb-4">🔍</div>
@@ -236,75 +374,169 @@ export default function CustomerPortal() {
                   </p>
                 </div>
 
-                {appointments.map((appointment) => (
-                  <div key={appointment.id} className="bg-white rounded-lg shadow-lg p-6">
-                    <div className="flex items-start justify-between mb-4">
-                      <div>
-                        <h3 className="text-2xl font-bold text-gray-900 mb-1">
-                          {appointment.customer_name}
-                        </h3>
-                        <p className="text-sm text-gray-600">
-                          Service: {getServiceTypeLabel(appointment.service_type)}
+                {appointments.map((appointment) => {
+                  const appointmentFiles = uploadedFiles[appointment.id] || []
+                  const isUploading = uploadingFiles[appointment.id] || false
+                  const uploadErr = uploadError[appointment.id]
+
+                  return (
+                    <div key={appointment.id} className="bg-white rounded-lg shadow-lg p-6">
+                      <div className="flex items-start justify-between mb-4">
+                        <div>
+                          <h3 className="text-2xl font-bold text-gray-900 mb-1">
+                            {appointment.customer_name}
+                          </h3>
+                          <p className="text-sm text-gray-600">
+                            Service: {getServiceTypeLabel(appointment.service_type)}
+                          </p>
+                        </div>
+                        <span
+                          className={`px-4 py-2 rounded-full text-sm font-semibold border ${getStatusColor(
+                            appointment.status
+                          )}`}
+                        >
+                          {appointment.status.toUpperCase()}
+                        </span>
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                        <div>
+                          <p className="text-sm font-semibold text-gray-700">Date & Time:</p>
+                          <p className="text-gray-900">
+                            {appointment.appointment_date} at {appointment.appointment_time}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-sm font-semibold text-gray-700">Phone:</p>
+                          <p className="text-gray-900">{formatPhoneDisplay(appointment.customer_phone)}</p>
+                        </div>
+                        <div>
+                          <p className="text-sm font-semibold text-gray-700">Email:</p>
+                          <p className="text-gray-900">{appointment.customer_email}</p>
+                        </div>
+                        <div>
+                          <p className="text-sm font-semibold text-gray-700">Submitted:</p>
+                          <p className="text-gray-900">
+                            {new Date(appointment.created_at).toLocaleDateString()}
+                          </p>
+                        </div>
+                      </div>
+
+                      {appointment.vehicle_make && (
+                        <div className="bg-gray-50 rounded-lg p-4 mb-4">
+                          <p className="text-sm font-semibold text-gray-700 mb-2">Vehicle Information:</p>
+                          <p className="text-gray-900">
+                            {appointment.vehicle_year} {appointment.vehicle_make} {appointment.vehicle_model}
+                          </p>
+                        </div>
+                      )}
+
+                      {appointment.damage_description && (
+                        <div className="bg-gray-50 rounded-lg p-4 mb-4">
+                          <p className="text-sm font-semibold text-gray-700 mb-2">Damage Description:</p>
+                          <p className="text-gray-900">{appointment.damage_description}</p>
+                        </div>
+                      )}
+
+                      {/* File Upload Section */}
+                      <div className="mt-6 pt-6 border-t border-gray-200">
+                        <div className="bg-blue-50 rounded-lg p-4 mb-4">
+                          <p className="text-sm font-semibold text-blue-900 mb-2">
+                            📎 Upload Photos & Documents
+                          </p>
+                          <p className="text-xs text-blue-700 mb-3">
+                            Add photos of damage, insurance documents, or other relevant files (Max 10 files, 10MB each)
+                          </p>
+                          
+                          <div className="flex items-center gap-2">
+                            <label className="flex-1">
+                              <input
+                                type="file"
+                                multiple
+                                accept="image/*,.pdf"
+                                onChange={(e) => handleFileSelect(appointment.id, e)}
+                                className="hidden"
+                                disabled={isUploading}
+                              />
+                              <span className="block w-full px-4 py-2 bg-white border-2 border-blue-300 rounded-lg text-blue-700 font-semibold text-center cursor-pointer hover:bg-blue-50 transition-colors">
+                                📁 Choose Files
+                              </span>
+                            </label>
+                            
+                            {appointmentFiles.length > 0 && (
+                              <button
+                                onClick={() => uploadFiles(appointment.id)}
+                                disabled={isUploading}
+                                className="px-6 py-2 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                              >
+                                {isUploading ? (
+                                  <span className="flex items-center gap-2">
+                                    <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
+                                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                                    </svg>
+                                    Uploading...
+                                  </span>
+                                ) : (
+                                  `⬆️ Upload ${appointmentFiles.length} File${appointmentFiles.length > 1 ? 's' : ''}`
+                                )}
+                              </button>
+                            )}
+                          </div>
+
+                          {uploadErr && (
+                            <div className="mt-3 bg-red-50 border-l-4 border-red-500 p-3 rounded-r">
+                              <p className="text-red-700 text-sm font-medium">{uploadErr}</p>
+                            </div>
+                          )}
+
+                          {appointmentFiles.length > 0 && (
+                            <div className="mt-4 space-y-2">
+                              <p className="text-xs font-semibold text-gray-700">Selected Files:</p>
+                              {appointmentFiles.map((uploadedFile, index) => (
+                                <div key={index} className="flex items-center justify-between bg-white p-2 rounded border border-gray-200">
+                                  <div className="flex items-center gap-2 flex-1 min-w-0">
+                                    {uploadedFile.preview && (
+                                      <img 
+                                        src={uploadedFile.preview} 
+                                        alt={uploadedFile.file.name}
+                                        className="w-10 h-10 object-cover rounded"
+                                      />
+                                    )}
+                                    <div className="min-w-0 flex-1">
+                                      <p className="text-sm font-medium text-gray-900 truncate">
+                                        {uploadedFile.file.name}
+                                      </p>
+                                      <p className="text-xs text-gray-500">
+                                        {(uploadedFile.file.size / 1024 / 1024).toFixed(2)} MB
+                                      </p>
+                                    </div>
+                                  </div>
+                                  <button
+                                    onClick={() => removeFile(appointment.id, index)}
+                                    className="ml-2 text-red-600 hover:text-red-700 font-bold"
+                                    disabled={isUploading}
+                                  >
+                                    ✕
+                                  </button>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="mt-6 pt-4 border-t border-gray-200">
+                        <p className="text-sm text-gray-600 text-center">
+                          Questions? Call us at{' '}
+                          <a href="tel:+12164818696" className="text-red-600 font-semibold hover:underline">
+                            (216) 481-8696
+                          </a>
                         </p>
                       </div>
-                      <span
-                        className={`px-4 py-2 rounded-full text-sm font-semibold border ${getStatusColor(
-                          appointment.status
-                        )}`}
-                      >
-                        {appointment.status.toUpperCase()}
-                      </span>
                     </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                      <div>
-                        <p className="text-sm font-semibold text-gray-700">Date & Time:</p>
-                        <p className="text-gray-900">
-                          {appointment.appointment_date} at {appointment.appointment_time}
-                        </p>
-                      </div>
-                      <div>
-                        <p className="text-sm font-semibold text-gray-700">Phone:</p>
-                        <p className="text-gray-900">{formatPhoneDisplay(appointment.customer_phone)}</p>
-                      </div>
-                      <div>
-                        <p className="text-sm font-semibold text-gray-700">Email:</p>
-                        <p className="text-gray-900">{appointment.customer_email}</p>
-                      </div>
-                      <div>
-                        <p className="text-sm font-semibold text-gray-700">Submitted:</p>
-                        <p className="text-gray-900">
-                          {new Date(appointment.created_at).toLocaleDateString()}
-                        </p>
-                      </div>
-                    </div>
-
-                    {appointment.vehicle_make && (
-                      <div className="bg-gray-50 rounded-lg p-4 mb-4">
-                        <p className="text-sm font-semibold text-gray-700 mb-2">Vehicle Information:</p>
-                        <p className="text-gray-900">
-                          {appointment.vehicle_year} {appointment.vehicle_make} {appointment.vehicle_model}
-                        </p>
-                      </div>
-                    )}
-
-                    {appointment.damage_description && (
-                      <div className="bg-gray-50 rounded-lg p-4">
-                        <p className="text-sm font-semibold text-gray-700 mb-2">Damage Description:</p>
-                        <p className="text-gray-900">{appointment.damage_description}</p>
-                      </div>
-                    )}
-
-                    <div className="mt-6 pt-4 border-t border-gray-200">
-                      <p className="text-sm text-gray-600 text-center">
-                        Questions? Call us at{' '}
-                        <a href="tel:+12164818696" className="text-red-600 font-semibold hover:underline">
-                          (216) 481-8696
-                        </a>
-                      </p>
-                    </div>
-                  </div>
-                ))}
+                  )
+                })}
               </>
             )}
           </div>
