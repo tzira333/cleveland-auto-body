@@ -4,6 +4,17 @@ import { useState, FormEvent, ChangeEvent, useRef, useEffect } from 'react'
 import { normalizePhone, formatPhoneDisplay } from '@/lib/utils/phone'
 import Link from 'next/link'
 
+interface AppointmentFile {
+  id: string
+  appointment_id: string
+  file_name: string
+  file_type: string
+  file_size: number
+  storage_path: string
+  public_url: string
+  created_at: string
+}
+
 interface Appointment {
   id: string
   customer_name: string
@@ -18,6 +29,7 @@ interface Appointment {
   vehicle_model?: string
   damage_description?: string
   created_at: string
+  files?: AppointmentFile[]
 }
 
 interface UploadedFile {
@@ -435,6 +447,58 @@ export default function CustomerPortal() {
                         <div className="bg-gray-50 rounded-lg p-4 mb-4">
                           <p className="text-sm font-semibold text-gray-700 mb-2">Damage Description:</p>
                           <p className="text-gray-900">{appointment.damage_description}</p>
+                        </div>
+                      )}
+
+                      {/* Existing Files Display */}
+                      {appointment.files && appointment.files.length > 0 && (
+                        <div className="bg-gray-50 rounded-lg p-4 mb-4">
+                          <p className="text-sm font-semibold text-gray-700 mb-3">
+                            📎 Uploaded Files ({appointment.files.length})
+                          </p>
+                          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+                            {appointment.files.map((file) => (
+                              <a
+                                key={file.id}
+                                href={file.public_url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="group relative bg-white rounded-lg border-2 border-gray-200 hover:border-blue-500 transition-all overflow-hidden"
+                              >
+                                {file.file_type.startsWith('image/') ? (
+                                  <div className="aspect-square">
+                                    <img
+                                      src={file.public_url}
+                                      alt={file.file_name}
+                                      className="w-full h-full object-cover"
+                                    />
+                                  </div>
+                                ) : (
+                                  <div className="aspect-square flex items-center justify-center bg-gray-100">
+                                    <div className="text-center p-2">
+                                      <svg className="w-12 h-12 mx-auto text-gray-400 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                                      </svg>
+                                      <p className="text-xs text-gray-600 font-medium">PDF</p>
+                                    </div>
+                                  </div>
+                                )}
+                                <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent p-2">
+                                  <p className="text-white text-xs font-medium truncate">
+                                    {file.file_name}
+                                  </p>
+                                  <p className="text-white/80 text-xs">
+                                    {(file.file_size / 1024 / 1024).toFixed(2)} MB
+                                  </p>
+                                </div>
+                                <div className="absolute top-2 right-2 bg-blue-600 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                                  </svg>
+                                </div>
+                              </a>
+                            ))}
+                          </div>
                         </div>
                       )}
 

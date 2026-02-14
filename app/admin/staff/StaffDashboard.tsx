@@ -5,6 +5,17 @@ import { createBrowserClient } from '@supabase/ssr'
 import { useRouter } from 'next/navigation'
 import ConvertToROButton from './appointments/ConvertToROButton'
 
+interface AppointmentFile {
+  id: string
+  appointment_id: string
+  file_name: string
+  file_type: string
+  file_size: number
+  storage_path: string
+  public_url: string
+  created_at: string
+}
+
 interface Appointment {
   id: string
   customer_name: string
@@ -18,6 +29,7 @@ interface Appointment {
   status: string
   created_at: string
   updated_at: string
+  files?: AppointmentFile[]
 }
 
 export default function StaffDashboard() {
@@ -50,7 +62,30 @@ export default function StaffDashboard() {
 
       if (fetchError) throw fetchError
 
-      setAppointments(data || [])
+      // Fetch files for each appointment
+      const appointmentsWithFiles = await Promise.all(
+        (data || []).map(async (appointment) => {
+          try {
+            const { data: files, error: filesError } = await supabase
+              .from('appointment_files')
+              .select('*')
+              .eq('appointment_id', appointment.id)
+              .order('created_at', { ascending: false })
+
+            if (filesError) {
+              console.warn(`Failed to fetch files for appointment ${appointment.id}:`, filesError)
+              return { ...appointment, files: [] }
+            }
+
+            return { ...appointment, files: files || [] }
+          } catch (err) {
+            console.warn(`Error fetching files for appointment ${appointment.id}:`, err)
+            return { ...appointment, files: [] }
+          }
+        })
+      )
+
+      setAppointments(appointmentsWithFiles)
     } catch (err) {
       console.error('Error fetching appointments:', err)
       setError('Failed to load appointments')
@@ -357,6 +392,60 @@ export default function StaffDashboard() {
                   <p>{selectedAppointment.damage_description || 'No description provided'}</p>
                 </div>
               </div>
+
+              {/* Uploaded Files */}
+              {selectedAppointment.files && selectedAppointment.files.length > 0 && (
+                <div>
+                  <h4 className="text-sm font-medium text-gray-700 mb-2">
+                    Uploaded Files ({selectedAppointment.files.length})
+                  </h4>
+                  <div className="bg-gray-50 p-4 rounded-lg">
+                    <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                      {selectedAppointment.files.map((file) => (
+                        <a
+                          key={file.id}
+                          href={file.public_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="group relative bg-white rounded-lg border-2 border-gray-200 hover:border-blue-500 transition-all overflow-hidden"
+                        >
+                          {file.file_type.startsWith('image/') ? (
+                            <div className="aspect-square">
+                              <img
+                                src={file.public_url}
+                                alt={file.file_name}
+                                className="w-full h-full object-cover"
+                              />
+                            </div>
+                          ) : (
+                            <div className="aspect-square flex items-center justify-center bg-gray-100">
+                              <div className="text-center p-2">
+                                <svg className="w-12 h-12 mx-auto text-gray-400 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                                </svg>
+                                <p className="text-xs text-gray-600 font-medium">PDF</p>
+                              </div>
+                            </div>
+                          )}
+                          <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent p-2">
+                            <p className="text-white text-xs font-medium truncate">
+                              {file.file_name}
+                            </p>
+                            <p className="text-white/80 text-xs">
+                              {(file.file_size / 1024 / 1024).toFixed(2)} MB
+                            </p>
+                          </div>
+                          <div className="absolute top-2 right-2 bg-blue-600 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                            </svg>
+                          </div>
+                        </a>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {/* Current Status */}
               <div>

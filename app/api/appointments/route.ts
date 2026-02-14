@@ -210,7 +210,30 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    return NextResponse.json({ appointments });
+    // Fetch files for each appointment
+    const appointmentsWithFiles = await Promise.all(
+      (appointments || []).map(async (appointment) => {
+        try {
+          const { data: files, error: filesError } = await supabase
+            .from('appointment_files')
+            .select('*')
+            .eq('appointment_id', appointment.id)
+            .order('created_at', { ascending: false });
+
+          if (filesError) {
+            console.warn(`Failed to fetch files for appointment ${appointment.id}:`, filesError);
+            return { ...appointment, files: [] };
+          }
+
+          return { ...appointment, files: files || [] };
+        } catch (err) {
+          console.warn(`Error fetching files for appointment ${appointment.id}:`, err);
+          return { ...appointment, files: [] };
+        }
+      })
+    );
+
+    return NextResponse.json({ appointments: appointmentsWithFiles });
   } catch (error) {
     console.error('API error:', error);
     return NextResponse.json(
