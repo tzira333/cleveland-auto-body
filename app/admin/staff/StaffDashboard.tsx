@@ -124,6 +124,45 @@ export default function StaffDashboard() {
     }
   }
 
+  const deleteAppointment = async (id: string) => {
+    // Confirm deletion
+    const confirmed = window.confirm(
+      'Are you sure you want to delete this appointment? This action cannot be undone.'
+    )
+
+    if (!confirmed) return
+
+    try {
+      // Delete associated files first (cascade should handle this, but explicit is safer)
+      const { error: filesError } = await supabase
+        .from('appointment_files')
+        .delete()
+        .eq('appointment_id', id)
+
+      if (filesError) {
+        console.warn('Error deleting appointment files:', filesError)
+      }
+
+      // Delete the appointment
+      const { error: deleteError } = await supabase
+        .from('appointments')
+        .delete()
+        .eq('id', id)
+
+      if (deleteError) throw deleteError
+
+      // Show success message
+      alert('Appointment deleted successfully')
+
+      // Refresh appointments list
+      fetchAppointments()
+      setSelectedAppointment(null)
+    } catch (err) {
+      console.error('Error deleting appointment:', err)
+      alert('Failed to delete appointment. Please try again.')
+    }
+  }
+
   const filteredAppointments = appointments.filter(apt => {
     const query = searchQuery.toLowerCase()
     return (
@@ -322,6 +361,15 @@ export default function StaffDashboard() {
                               onSuccess={fetchAppointments}
                             />
                           )}
+                          <button
+                            onClick={() => deleteAppointment(appointment.id)}
+                            className="text-red-600 hover:text-red-900 p-1 rounded hover:bg-red-50 transition-colors"
+                            title="Delete appointment"
+                          >
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                            </svg>
+                          </button>
                         </div>
                       </td>
                     </tr>
@@ -478,19 +526,31 @@ export default function StaffDashboard() {
             </div>
 
             <div className="p-6 border-t border-gray-200 flex justify-between items-center">
-              {selectedAppointment.status === 'completed' && (
-                <ConvertToROButton 
-                  appointmentId={selectedAppointment.id}
-                  appointmentStatus={selectedAppointment.status}
-                  onSuccess={() => {
-                    fetchAppointments()
-                    setSelectedAppointment(null)
-                  }}
-                />
-              )}
+              <div className="flex items-center gap-3">
+                {selectedAppointment.status === 'completed' && (
+                  <ConvertToROButton 
+                    appointmentId={selectedAppointment.id}
+                    appointmentStatus={selectedAppointment.status}
+                    onSuccess={() => {
+                      fetchAppointments()
+                      setSelectedAppointment(null)
+                    }}
+                  />
+                )}
+                <button
+                  onClick={() => deleteAppointment(selectedAppointment.id)}
+                  className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors flex items-center gap-2"
+                  title="Delete appointment"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                  </svg>
+                  Delete
+                </button>
+              </div>
               <button
                 onClick={() => setSelectedAppointment(null)}
-                className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors ml-auto"
+                className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors"
               >
                 Close
               </button>
