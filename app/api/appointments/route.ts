@@ -43,12 +43,33 @@ export async function POST(request: NextRequest) {
       if (jsonData.vehicleYear || jsonData.vehicleMake || jsonData.vehicleModel) {
         vehicle_info = `${jsonData.vehicleYear || ''} ${jsonData.vehicleMake || ''} ${jsonData.vehicleModel || ''}`.trim();
       } else {
-        vehicle_info = jsonData.vehicle_info || '';
+        vehicle_info = jsonData.vehicleInfo || jsonData.vehicle_info || '';
       }
       
-      damage_description = jsonData.damageDescription || jsonData.damage_description || '';
-      appointment_date = jsonData.appointmentDate || jsonData.preferredDate || jsonData.appointment_date || '';
-      appointment_time = jsonData.appointmentTime || jsonData.preferredTime || jsonData.appointment_time || '';
+      // Handle tow-specific fields (location + destination)
+      let towDetails = '';
+      if (jsonData.location) {
+        towDetails = `Pickup Location: ${jsonData.location}`;
+        if (jsonData.destination) {
+          towDetails += ` | Destination: ${jsonData.destination}`;
+        }
+      }
+      
+      // Build damage description from various sources
+      let descriptionParts = [];
+      if (jsonData.damageDescription || jsonData.damage_description) {
+        descriptionParts.push(jsonData.damageDescription || jsonData.damage_description);
+      }
+      if (jsonData.message) {
+        descriptionParts.push(`Additional Info: ${jsonData.message}`);
+      }
+      if (towDetails) {
+        descriptionParts.push(towDetails);
+      }
+      damage_description = descriptionParts.join('\n') || '';
+      
+      appointment_date = jsonData.date || jsonData.appointmentDate || jsonData.preferredDate || jsonData.appointment_date || '';
+      appointment_time = jsonData.time || jsonData.appointmentTime || jsonData.preferredTime || jsonData.appointment_time || '';
       status = jsonData.status || 'pending';
       file_count = 0; // JSON requests don't include files
     } else {

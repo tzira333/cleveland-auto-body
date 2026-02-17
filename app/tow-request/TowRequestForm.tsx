@@ -21,6 +21,7 @@ export default function TowRequestForm() {
   const [error, setError] = useState('')
   const [success, setSuccess] = useState(false)
   const [confirmationNumber, setConfirmationNumber] = useState('')
+  const [showVehicleInfoModal, setShowVehicleInfoModal] = useState(false)
 
   const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const formatted = formatPhoneInput(e.target.value)
@@ -43,7 +44,13 @@ export default function TowRequestForm() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          ...formData,
+          name: formData.name,
+          phone: formData.phone,
+          email: formData.email,
+          vehicleInfo: formData.vehicleInfo,
+          location: formData.location,
+          destination: formData.destination,
+          message: formData.message,
           serviceType: 'tow-service',
           date: new Date().toISOString().split('T')[0],
           time: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true }),
@@ -53,13 +60,14 @@ export default function TowRequestForm() {
       const data = await response.json()
 
       if (!response.ok) {
-        throw new Error(data.message || 'Failed to submit tow request')
+        throw new Error(data.error || data.message || 'Failed to submit tow request')
       }
 
       const confNumber = generateConfirmationNumber()
       setConfirmationNumber(confNumber)
       setSuccess(true)
     } catch (err: any) {
+      console.error('Tow request error:', err)
       setError(err.message || 'An error occurred. Please try again.')
     } finally {
       setLoading(false)
@@ -191,6 +199,55 @@ export default function TowRequestForm() {
     <div className="max-w-5xl mx-auto">
       <h1 className="text-3xl font-bold text-center mb-6">Request Tow Service</h1>
 
+      {/* Vehicle Info Modal */}
+      {showVehicleInfoModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4" onClick={() => setShowVehicleInfoModal(false)}>
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-start mb-4">
+              <div className="bg-blue-100 rounded-full p-2 mr-3">
+                <svg className="w-6 h-6 text-blue-600" fill="currentColor" viewBox="0 0 20 20">
+                  <path d="M8 16.5a1.5 1.5 0 11-3 0 1.5 1.5 0 013 0zM15 16.5a1.5 1.5 0 11-3 0 1.5 1.5 0 013 0z" />
+                  <path d="M3 4a1 1 0 00-1 1v10a1 1 0 001 1h1.05a2.5 2.5 0 014.9 0H10a1 1 0 001-1V5a1 1 0 00-1-1H3zM14 7a1 1 0 00-1 1v6.05A2.5 2.5 0 0115.95 16H17a1 1 0 001-1v-5a1 1 0 00-.293-.707l-2-2A1 1 0 0015 7h-1z" />
+                </svg>
+              </div>
+              <div className="flex-1">
+                <h3 className="text-lg font-bold text-gray-900 mb-2">Vehicle Information Required</h3>
+                <p className="text-sm text-gray-700 mb-3">Please specify all of the following:</p>
+                <ul className="space-y-2 text-sm text-gray-700">
+                  <li className="flex items-start">
+                    <span className="text-blue-600 mr-2 font-bold">✓</span>
+                    <span><strong>Year</strong> (e.g., 2020)</span>
+                  </li>
+                  <li className="flex items-start">
+                    <span className="text-blue-600 mr-2 font-bold">✓</span>
+                    <span><strong>Make</strong> (e.g., Honda, Toyota, Ford)</span>
+                  </li>
+                  <li className="flex items-start">
+                    <span className="text-blue-600 mr-2 font-bold">✓</span>
+                    <span><strong>Model</strong> (e.g., Accord, Camry, F-150)</span>
+                  </li>
+                  <li className="flex items-start">
+                    <span className="text-blue-600 mr-2 font-bold">✓</span>
+                    <span><strong>Color</strong> (e.g., Silver, Black, White)</span>
+                  </li>
+                </ul>
+                <div className="mt-4 p-3 bg-blue-50 rounded-lg">
+                  <p className="text-xs text-gray-600 font-semibold mb-1">Example:</p>
+                  <p className="text-sm font-mono text-blue-900">2020 Honda Accord, Silver</p>
+                </div>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => setShowVehicleInfoModal(false)}
+              className="w-full mt-4 px-4 py-2 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition-colors"
+            >
+              Got it!
+            </button>
+          </div>
+        </div>
+      )}
+
       <form onSubmit={handleSubmit} className="grid md:grid-cols-2 gap-x-6 gap-y-4">
         {/* Left Column */}
         <div className="space-y-4">
@@ -230,15 +287,26 @@ export default function TowRequestForm() {
           </div>
 
           <div>
-            <label className="block text-gray-700 font-semibold mb-1 text-sm">Vehicle Info *</label>
+            <label className="block text-gray-700 font-semibold mb-1 text-sm flex items-center justify-between">
+              <span>Vehicle Info *</span>
+              <button
+                type="button"
+                onClick={() => setShowVehicleInfoModal(true)}
+                className="text-blue-600 hover:text-blue-800 text-xs underline"
+              >
+                What to include?
+              </button>
+            </label>
             <input
               type="text"
               value={formData.vehicleInfo}
               onChange={(e) => setFormData({ ...formData, vehicleInfo: e.target.value })}
+              onFocus={() => setShowVehicleInfoModal(true)}
               required
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent text-sm"
               placeholder="2020 Honda Accord, Silver"
             />
+            <p className="text-xs text-gray-600 mt-1">Include: Year, Make, Model, Color</p>
           </div>
         </div>
 
@@ -308,4 +376,3 @@ export default function TowRequestForm() {
     </div>
   )
 }
-
