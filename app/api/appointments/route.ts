@@ -17,19 +17,55 @@ export const dynamic = 'force-dynamic';
 
 export async function POST(request: NextRequest) {
   try {
-    const formData = await request.formData();
+    const contentType = request.headers.get('content-type') || '';
+    let customer_name: string;
+    let customer_phone: string;
+    let customer_email: string;
+    let service_type: string;
+    let vehicle_info: string;
+    let damage_description: string;
+    let appointment_date: string;
+    let appointment_time: string;
+    let status: string;
+    let file_count: number;
+    let formData: FormData | null = null;
 
-    // Extract form fields
-    const customer_name = formData.get('customer_name') as string;
-    let customer_phone = formData.get('customer_phone') as string;
-    const customer_email = formData.get('customer_email') as string || '';
-    const service_type = formData.get('service_type') as string;
-    const vehicle_info = formData.get('vehicle_info') as string || '';
-    const damage_description = formData.get('damage_description') as string || '';
-    const appointment_date = formData.get('appointment_date') as string || '';
-    const appointment_time = formData.get('appointment_time') as string || '';
-    const status = formData.get('status') as string || 'pending';
-    const file_count = parseInt(formData.get('file_count') as string || '0');
+    // Handle JSON requests (from Express Care, etc.)
+    if (contentType.includes('application/json')) {
+      const jsonData = await request.json();
+      
+      customer_name = jsonData.name || jsonData.customer_name;
+      customer_phone = jsonData.phone || jsonData.customer_phone;
+      customer_email = jsonData.email || jsonData.customer_email || '';
+      service_type = jsonData.serviceType || jsonData.service_type;
+      
+      // Build vehicle info from separate fields if provided
+      if (jsonData.vehicleYear || jsonData.vehicleMake || jsonData.vehicleModel) {
+        vehicle_info = `${jsonData.vehicleYear || ''} ${jsonData.vehicleMake || ''} ${jsonData.vehicleModel || ''}`.trim();
+      } else {
+        vehicle_info = jsonData.vehicle_info || '';
+      }
+      
+      damage_description = jsonData.damageDescription || jsonData.damage_description || '';
+      appointment_date = jsonData.appointmentDate || jsonData.preferredDate || jsonData.appointment_date || '';
+      appointment_time = jsonData.appointmentTime || jsonData.preferredTime || jsonData.appointment_time || '';
+      status = jsonData.status || 'pending';
+      file_count = 0; // JSON requests don't include files
+    } else {
+      // Handle FormData requests (from Schedule page, etc.)
+      formData = await request.formData();
+      
+      customer_name = formData.get('customer_name') as string;
+      customer_phone = formData.get('customer_phone') as string;
+      customer_email = formData.get('customer_email') as string || '';
+      service_type = formData.get('service_type') as string;
+      vehicle_info = formData.get('vehicle_info') as string || '';
+      damage_description = formData.get('damage_description') as string || '';
+      appointment_date = formData.get('appointment_date') as string || '';
+      appointment_time = formData.get('appointment_time') as string || '';
+      status = formData.get('status') as string || 'pending';
+      file_count = parseInt(formData.get('file_count') as string || '0');
+    }
 
     // Normalize phone number (remove all non-digits)
     if (customer_phone) {
@@ -96,8 +132,8 @@ export async function POST(request: NextRequest) {
     const appointmentId = appointment.id;
     const uploadedFiles: any[] = [];
 
-    // Process file uploads if any
-    if (file_count > 0) {
+    // Process file uploads if any (only for FormData requests)
+    if (file_count > 0 && formData) {
       for (let i = 0; i < file_count; i++) {
         const file = formData.get(`file_${i}`) as File;
         if (!file) continue;
