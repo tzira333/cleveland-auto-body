@@ -118,12 +118,21 @@ export default function CustomerPortal() {
 
     const maxSize = 10 * 1024 * 1024 // 10MB per file
     const maxFiles = 10
+    // Comprehensive list of safe image and document types
     const allowedTypes = [
+      // Standard image formats
       'image/jpeg',
-      'image/png',
       'image/jpg',
+      'image/png',
       'image/gif',
       'image/webp',
+      'image/bmp',
+      'image/tiff',
+      'image/svg+xml',
+      // HEIC/HEIF (iOS images)
+      'image/heic',
+      'image/heif',
+      // Documents
       'application/pdf',
     ]
 
@@ -147,10 +156,17 @@ export default function CustomerPortal() {
         return
       }
 
-      if (!allowedTypes.includes(file.type)) {
+      // Check file type by MIME type or file extension (for mobile compatibility)
+      const fileExtension = file.name.split('.').pop()?.toLowerCase()
+      const validExtensions = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'tiff', 'heic', 'heif', 'svg', 'pdf']
+      const isValidType = allowedTypes.includes(file.type) || 
+                          (fileExtension && validExtensions.includes(fileExtension)) ||
+                          file.type === '' // Some mobile browsers don't set MIME type
+
+      if (!isValidType) {
         setUploadError(prev => ({ 
           ...prev, 
-          [appointmentId]: `File ${file.name} type not supported` 
+          [appointmentId]: `File ${file.name} type not supported. Accepted: images (JPG, PNG, etc.) and PDF` 
         }))
         return
       }
@@ -517,7 +533,7 @@ export default function CustomerPortal() {
                               <input
                                 type="file"
                                 multiple
-                                accept="image/*,.pdf"
+                                accept="image/*,.pdf,.heic,.heif"
                                 onChange={(e) => handleFileSelect(appointment.id, e)}
                                 className="hidden"
                                 disabled={isUploading}

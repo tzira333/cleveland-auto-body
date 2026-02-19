@@ -51,7 +51,13 @@ export async function POST(request: NextRequest) {
       try {
         // Create unique file name
         const timestamp = Date.now();
-        const sanitizedFileName = file.name.replace(/[^a-zA-Z0-9.-]/g, '_');
+        // More permissive sanitization: allow alphanumeric, dots, hyphens, underscores
+        // Remove only unsafe characters for file systems and URLs
+        const sanitizedFileName = file.name
+          .replace(/[^a-zA-Z0-9._-]/g, '_')  // Allow underscores and common chars
+          .replace(/\s+/g, '_')              // Replace whitespace with underscores
+          .replace(/_{2,}/g, '_')            // Replace multiple underscores with single
+          .toLowerCase();                    // Normalize to lowercase
         const fileName = `${appointment_id}/${timestamp}_${sanitizedFileName}`;
 
         console.log(`Uploading file: ${fileName}`);
