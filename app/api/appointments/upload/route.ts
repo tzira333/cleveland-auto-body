@@ -51,16 +51,40 @@ export async function POST(request: NextRequest) {
       try {
         // Create unique file name
         const timestamp = Date.now();
-        // More permissive sanitization: allow alphanumeric, dots, hyphens, underscores
-        // Remove only unsafe characters for file systems and URLs
+        
+        // Supabase Storage validation regex (from storage-api):
+        // /^(\w|\/|!|\-|\.|\\*|'|\(|\)| |&|\$|@|\=|;|:|\\+|,|\?)*$/
+        // Allowed: word chars (\w = a-z, A-Z, 0-9, _), forward slash, and special chars: ! - . * ' ( ) space & $ @ = ; : + , ?
+        // 
+        // Strategy: Use ONLY safe characters (alphanumeric, hyphen, underscore, dot)
+        // Remove ALL other characters to avoid Supabase validation errors
+        
         const sanitizedFileName = file.name
-          .replace(/[^a-zA-Z0-9._-]/g, '_')  // Allow underscores and common chars
-          .replace(/\s+/g, '_')              // Replace whitespace with underscores
-          .replace(/_{2,}/g, '_')            // Replace multiple underscores with single
-          .toLowerCase();                    // Normalize to lowercase
-        const fileName = `${appointment_id}/${timestamp}_${sanitizedFileName}`;
+          .replace(/[^\w.-]/g, '-')  // Replace any non-word/dot/hyphen with hyphen
+          .replace(/\s+/g, '-')       // Replace spaces with hyphens
+          .replace(/-{2,}/g, '-')     // Replace multiple hyphens with single
+          .replace(/^-+|-+$/g, '')    // Remove leading/trailing hyphens
+          .toLowerCase();             // Normalize to lowercase
+        
+        // Ensure appointment_id is also safe (remove any non-alphanumeric except hyphen/underscore)
+        const safeAppointmentId = String(appointment_id).replace(/[^\w-]/g, '');
+        
+        const fileName = `${safeAppointmentId}/${timestamp}_${sanitizedFileName}`;
 
         console.log(`Uploading file: ${fileName}`);
+        console.log(`Original filename: ${file.name}`);
+        console.log(`Sanitized filename: ${sanitizedFileName}`);
+        console.log(`File type: ${file.type}`);
+        console.log(`File size: ${file.size} bytes`);
+
+        // Validate the path matches Supabase Storage requirements
+        // Regex from supabase/storage-api: /^(\w|\/|!|\-|\.|\\*|'|\(|\)| |&|\$|@|\=|;|:|\\+|,|\?)*$/
+        const supabasePathRegex = /^(\w|\/|!|\-|\.|\*|'|\(|\)| |&|\$|@|=|;|:|\+|,|\?)*$/;
+        if (!supabasePathRegex.test(fileName)) {
+          console.error(`Invalid file path for Supabase: ${fileName}`);
+          errors.push(`${file.name}: Invalid filename format`);
+          continue;
+        }
 
         // Convert file to buffer
         const arrayBuffer = await file.arrayBuffer();
@@ -94,7 +118,16 @@ export async function POST(request: NextRequest) {
 
           if (uploadError) {
             console.error('File upload error:', uploadError);
-            errors.push(`${file.name}: ${uploadError.message}`);
+            // Provide more specific error messages
+            if (uploadError.message.includes('pattern')) {
+              errors.push(`${file.name}: Invalid filename format. Please use only letters, numbers, dots, and hyphens.`);
+            } else if (uploadError.message.includes('size')) {
+              errors.push(`${file.name}: File too large (max 10MB)`);
+            } else if (uploadError.message.includes('bucket')) {
+              errors.push(`${file.name}: Storage configuration error`);
+            } else {
+              errors.push(`${file.name}: ${uploadError.message}`);
+            }
             continue;
           }
 
