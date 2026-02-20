@@ -27,7 +27,29 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // First, ensure the appointment_notes table exists
+    // Ensure table exists
+    const { data: tableCheck, error: tableError } = await supabase
+      .from('appointment_notes')
+      .select('id')
+      .limit(1);
+
+    if (tableError && tableError.code === '42P01') {
+      // Table doesn't exist, create it
+      console.log('Creating appointment_notes table...');
+      
+      // Note: In production, use migrations. This is a fallback.
+      const { error: createError } = await supabase.rpc('create_appointment_notes_table', {});
+      
+      if (createError) {
+        console.warn('Could not create table automatically:', createError);
+        return NextResponse.json({
+          notes: [],
+          message: 'Notes table not yet created. Please run database migrations.'
+        });
+      }
+    }
+
+    // Fetch notes
     const { data: notes, error: fetchError } = await supabase
       .from('appointment_notes')
       .select('*')
@@ -35,20 +57,22 @@ export async function GET(request: NextRequest) {
       .order('created_at', { ascending: false });
 
     if (fetchError) {
-      // If table doesn't exist, return empty array
-      if (fetchError.message.includes('does not exist')) {
-        console.warn('appointment_notes table does not exist yet');
-        return NextResponse.json({ notes: [] });
-      }
-      throw fetchError;
+      console.error('Error fetching notes:', fetchError);
+      return NextResponse.json(
+        { error: 'Failed to fetch notes', details: fetchError.message },
+        { status: 500 }
+      );
     }
 
-    return NextResponse.json({ notes: notes || [] });
+    return NextResponse.json({
+      notes: notes || [],
+      count: notes?.length || 0
+    });
 
   } catch (error: any) {
-    console.error('Error fetching appointment notes:', error);
+    console.error('Notes GET error:', error);
     return NextResponse.json(
-      { error: 'Failed to fetch notes', details: error.message },
+      { error: 'Internal server error', details: error.message },
       { status: 500 }
     );
   }
@@ -60,100 +84,54 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { appointment_id, note_text, staff_name } = body;
 
-    if (!appointment_id || !note_text) {
+    // Validation
+    if (!appointment_id || !note_text || !staff_name) {
       return NextResponse.json(
-        { error: 'Appointment ID and note text are required' },
+        { error: 'Missing required fields: appointment_id, note_text, staff_name' },
         { status: 400 }
       );
     }
 
-    // Ensure the appointment_notes table exists, create if it doesn't
-    try {
-      // Try to create the table (will fail silently if it already exists)
-      await supabase.rpc('create_appointment_notes_table_if_not_exists', {});
-    } catch (e) {
-      // Table might already exist or RPC function not available
-      // We'll try to insert anyway
+    if (note_text.trim().length === 0) {
+      return NextResponse.json(
+        { error: 'Note text cannot be empty' },
+        { status: 400 }
+      );
     }
 
+    // Insert note
     const { data: note, error: insertError } = await supabase
       .from('appointment_notes')
       .insert([
         {
           appointment_id,
-          note_text,
-          staff_name: staff_name || 'Staff',
+          note_text: note_text.trim(),
+          staff_name,
           created_at: new Date().toISOString(),
-        },
+          updated_at: new Date().toISOString()
+        }
       ])
       .select()
       .single();
 
     if (insertError) {
-      // If table doesn't exist, try to create it using raw SQL
-      if (insertError.message.includes('does not exist')) {
-        console.log('Creating appointment_notes table...');
-        
-        // Create table using raw SQL
-        const { error: createError } = await supabase.rpc('exec_sql', {
-          sql: `
-            CREATE TABLE IF NOT EXISTS appointment_notes (
-              id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-              appointment_id UUID NOT NULL REFERENCES appointments(id) ON DELETE CASCADE,
-              note_text TEXT NOT NULL,
-              staff_name TEXT,
-              created_at TIMESTAMPTZ DEFAULT NOW(),
-              updated_at TIMESTAMPTZ DEFAULT NOW()
-            );
-            
-            CREATE INDEX IF NOT EXISTS idx_appointment_notes_appointment_id 
-            ON appointment_notes(appointment_id);
-            
-            CREATE INDEX IF NOT EXISTS idx_appointment_notes_created_at 
-            ON appointment_notes(created_at DESC);
-          `
-        });
-
-        if (createError) {
-          console.warn('Could not create table via RPC:', createError);
-          // Return a helpful message
-          return NextResponse.json(
-            { 
-              error: 'Database table not initialized',
-              message: 'Please contact your administrator to set up the appointment_notes table',
-              sqlNeeded: true
-            },
-            { status: 503 }
-          );
-        }
-
-        // Retry the insert
-        const { data: retryNote, error: retryError } = await supabase
-          .from('appointment_notes')
-          .insert([
-            {
-              appointment_id,
-              note_text,
-              staff_name: staff_name || 'Staff',
-              created_at: new Date().toISOString(),
-            },
-          ])
-          .select()
-          .single();
-
-        if (retryError) throw retryError;
-        return NextResponse.json({ note: retryNote });
-      }
-      
-      throw insertError;
+      console.error('Error creating note:', insertError);
+      return NextResponse.json(
+        { error: 'Failed to create note', details: insertError.message },
+        { status: 500 }
+      );
     }
 
-    return NextResponse.json({ note });
+    return NextResponse.json({
+      success: true,
+      note,
+      message: 'Note added successfully'
+    });
 
   } catch (error: any) {
-    console.error('Error creating appointment note:', error);
+    console.error('Notes POST error:', error);
     return NextResponse.json(
-      { error: 'Failed to create note', details: error.message },
+      { error: 'Internal server error', details: error.message },
       { status: 500 }
     );
   }
@@ -165,31 +143,57 @@ export async function PUT(request: NextRequest) {
     const body = await request.json();
     const { note_id, note_text } = body;
 
+    // Validation
     if (!note_id || !note_text) {
       return NextResponse.json(
-        { error: 'Note ID and note text are required' },
+        { error: 'Missing required fields: note_id, note_text' },
         { status: 400 }
       );
     }
 
+    if (note_text.trim().length === 0) {
+      return NextResponse.json(
+        { error: 'Note text cannot be empty' },
+        { status: 400 }
+      );
+    }
+
+    // Update note
     const { data: note, error: updateError } = await supabase
       .from('appointment_notes')
       .update({
-        note_text,
-        updated_at: new Date().toISOString(),
+        note_text: note_text.trim(),
+        updated_at: new Date().toISOString()
       })
       .eq('id', note_id)
       .select()
       .single();
 
-    if (updateError) throw updateError;
+    if (updateError) {
+      console.error('Error updating note:', updateError);
+      return NextResponse.json(
+        { error: 'Failed to update note', details: updateError.message },
+        { status: 500 }
+      );
+    }
 
-    return NextResponse.json({ note });
+    if (!note) {
+      return NextResponse.json(
+        { error: 'Note not found' },
+        { status: 404 }
+      );
+    }
+
+    return NextResponse.json({
+      success: true,
+      note,
+      message: 'Note updated successfully'
+    });
 
   } catch (error: any) {
-    console.error('Error updating appointment note:', error);
+    console.error('Notes PUT error:', error);
     return NextResponse.json(
-      { error: 'Failed to update note', details: error.message },
+      { error: 'Internal server error', details: error.message },
       { status: 500 }
     );
   }
@@ -208,19 +212,29 @@ export async function DELETE(request: NextRequest) {
       );
     }
 
+    // Delete note
     const { error: deleteError } = await supabase
       .from('appointment_notes')
       .delete()
       .eq('id', note_id);
 
-    if (deleteError) throw deleteError;
+    if (deleteError) {
+      console.error('Error deleting note:', deleteError);
+      return NextResponse.json(
+        { error: 'Failed to delete note', details: deleteError.message },
+        { status: 500 }
+      );
+    }
 
-    return NextResponse.json({ success: true });
+    return NextResponse.json({
+      success: true,
+      message: 'Note deleted successfully'
+    });
 
   } catch (error: any) {
-    console.error('Error deleting appointment note:', error);
+    console.error('Notes DELETE error:', error);
     return NextResponse.json(
-      { error: 'Failed to delete note', details: error.message },
+      { error: 'Internal server error', details: error.message },
       { status: 500 }
     );
   }
