@@ -16,6 +16,15 @@ interface AppointmentFile {
   created_at: string
 }
 
+interface AppointmentNote {
+  id: string
+  appointment_id: string
+  note_text: string
+  staff_name: string
+  created_at: string
+  updated_at: string
+}
+
 interface Appointment {
   id: string
   customer_name: string
@@ -30,6 +39,7 @@ interface Appointment {
   created_at: string
   updated_at: string
   files?: AppointmentFile[]
+  notes?: AppointmentNote[]
 }
 
 export default function StaffDashboard() {
@@ -39,6 +49,12 @@ export default function StaffDashboard() {
   const [error, setError] = useState('')
   const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
+  const [appointmentNotes, setAppointmentNotes] = useState<AppointmentNote[]>([])
+  const [newNoteText, setNewNoteText] = useState('')
+  const [editingNoteId, setEditingNoteId] = useState<string | null>(null)
+  const [editingNoteText, setEditingNoteText] = useState('')
+  const [loadingNotes, setLoadingNotes] = useState(false)
+  const [savingNote, setSavingNote] = useState(false)
 
   // Create Supabase client (SINGLE DEFINITION)
   const supabase = createBrowserClient(
@@ -100,6 +116,114 @@ export default function StaffDashboard() {
       router.push('/admin/staff/login')
     } catch (err) {
       console.error('Error signing out:', err)
+    }
+  }
+
+  // Fetch notes for an appointment
+  const fetchAppointmentNotes = async (appointmentId: string) => {
+    try {
+      setLoadingNotes(true)
+      const response = await fetch(`/api/appointments/notes?appointment_id=${appointmentId}`)
+      const data = await response.json()
+      
+      if (response.ok) {
+        setAppointmentNotes(data.notes || [])
+      } else {
+        console.error('Error fetching notes:', data.error)
+        setAppointmentNotes([])
+      }
+    } catch (err) {
+      console.error('Error fetching appointment notes:', err)
+      setAppointmentNotes([])
+    } finally {
+      setLoadingNotes(false)
+    }
+  }
+
+  // Add a new note
+  const addAppointmentNote = async () => {
+    if (!selectedAppointment || !newNoteText.trim()) return
+
+    try {
+      setSavingNote(true)
+      const response = await fetch('/api/appointments/notes', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          appointment_id: selectedAppointment.id,
+          note_text: newNoteText.trim(),
+          staff_name: 'Staff' // You can get this from auth context
+        })
+      })
+
+      const data = await response.json()
+
+      if (response.ok) {
+        setAppointmentNotes([data.note, ...appointmentNotes])
+        setNewNoteText('')
+      } else {
+        alert('Failed to add note: ' + (data.error || 'Unknown error'))
+      }
+    } catch (err) {
+      console.error('Error adding note:', err)
+      alert('Failed to add note')
+    } finally {
+      setSavingNote(false)
+    }
+  }
+
+  // Update an existing note
+  const updateAppointmentNote = async (noteId: string, noteText: string) => {
+    try {
+      setSavingNote(true)
+      const response = await fetch('/api/appointments/notes', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          note_id: noteId,
+          note_text: noteText.trim()
+        })
+      })
+
+      const data = await response.json()
+
+      if (response.ok) {
+        setAppointmentNotes(
+          appointmentNotes.map(note => 
+            note.id === noteId ? data.note : note
+          )
+        )
+        setEditingNoteId(null)
+        setEditingNoteText('')
+      } else {
+        alert('Failed to update note: ' + (data.error || 'Unknown error'))
+      }
+    } catch (err) {
+      console.error('Error updating note:', err)
+      alert('Failed to update note')
+    } finally {
+      setSavingNote(false)
+    }
+  }
+
+  // Delete a note
+  const deleteAppointmentNote = async (noteId: string) => {
+    if (!confirm('Are you sure you want to delete this note?')) return
+
+    try {
+      const response = await fetch(`/api/appointments/notes?note_id=${noteId}`, {
+        method: 'DELETE'
+      })
+
+      if (response.ok) {
+        setAppointmentNotes(appointmentNotes.filter(note => note.id !== noteId))
+      } else {
+        const data = await response.json()
+        alert('Failed to delete note: ' + (data.error || 'Unknown error'))
+      }
+    } catch (err) {
+      console.error('Error deleting note:', err)
+      alert('Failed to delete note')
     }
   }
 
@@ -200,6 +324,15 @@ export default function StaffDashboard() {
   }
 
   const formatTime = (timeString: string) => {
+    // If it's a full ISO timestamp, extract time
+    if (timeString.includes('T')) {
+      return new Date(timeString).toLocaleTimeString('en-US', {
+        hour: 'numeric',
+        minute: '2-digit',
+        hour12: true
+      })
+    }
+    // Otherwise return as-is (for appointment times like "09:00:00")
     return timeString
   }
 
@@ -349,7 +482,10 @@ export default function StaffDashboard() {
                       <td className="px-6 py-4 whitespace-nowrap text-sm">
                         <div className="flex items-center gap-2">
                           <button
-                            onClick={() => setSelectedAppointment(appointment)}
+                            onClick={() => {
+                              setSelectedAppointment(appointment)
+                              fetchAppointmentNotes(appointment.id)
+                            }}
                             className="text-blue-600 hover:text-blue-900 font-medium"
                           >
                             View Details
@@ -521,6 +657,164 @@ export default function StaffDashboard() {
                       {status.charAt(0).toUpperCase() + status.slice(1)}
                     </button>
                   ))}
+                </div>
+              </div>
+
+              {/* Progress Notes & Updates */}
+              <div className="border-t pt-4">
+                <h4 className="text-lg font-semibold text-gray-900 mb-3 flex items-center gap-2">
+                  <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
+                  Progress Notes & Updates
+                </h4>
+
+                {/* Add New Note */}
+                <div className="bg-blue-50 p-4 rounded-lg mb-4">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Add New Note
+                  </label>
+                  <textarea
+                    value={newNoteText}
+                    onChange={(e) => setNewNoteText(e.target.value)}
+                    placeholder="Enter progress update, notes, or additional information..."
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 min-h-[100px] resize-y"
+                    disabled={savingNote}
+                  />
+                  <div className="mt-2 flex justify-end">
+                    <button
+                      onClick={addAppointmentNote}
+                      disabled={!newNoteText.trim() || savingNote}
+                      className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
+                    >
+                      {savingNote ? (
+                        <>
+                          <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                          </svg>
+                          Saving...
+                        </>
+                      ) : (
+                        <>
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                          </svg>
+                          Add Note
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </div>
+
+                {/* Notes List */}
+                <div className="space-y-3">
+                  <h5 className="text-sm font-medium text-gray-700">
+                    History ({appointmentNotes.length})
+                  </h5>
+                  
+                  {loadingNotes ? (
+                    <div className="text-center py-8">
+                      <svg className="animate-spin h-8 w-8 text-blue-600 mx-auto" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                      <p className="text-sm text-gray-500 mt-2">Loading notes...</p>
+                    </div>
+                  ) : appointmentNotes.length === 0 ? (
+                    <div className="text-center py-8 bg-gray-50 rounded-lg">
+                      <svg className="w-12 h-12 text-gray-400 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                      </svg>
+                      <p className="text-sm text-gray-500">No notes yet. Add the first progress update above.</p>
+                    </div>
+                  ) : (
+                    <div className="max-h-96 overflow-y-auto space-y-3">
+                      {appointmentNotes.map((note) => (
+                        <div key={note.id} className="bg-white border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
+                          <div className="flex justify-between items-start mb-2">
+                            <div className="flex items-center gap-2">
+                              <svg className="w-4 h-4 text-blue-600" fill="currentColor" viewBox="0 0 20 20">
+                                <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" />
+                              </svg>
+                              <span className="text-sm font-medium text-gray-900">{note.staff_name}</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              {editingNoteId !== note.id && (
+                                <>
+                                  <button
+                                    onClick={() => {
+                                      setEditingNoteId(note.id)
+                                      setEditingNoteText(note.note_text)
+                                    }}
+                                    className="text-gray-400 hover:text-blue-600 transition-colors"
+                                    title="Edit note"
+                                  >
+                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                    </svg>
+                                  </button>
+                                  <button
+                                    onClick={() => deleteAppointmentNote(note.id)}
+                                    className="text-gray-400 hover:text-red-600 transition-colors"
+                                    title="Delete note"
+                                  >
+                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                    </svg>
+                                  </button>
+                                </>
+                              )}
+                            </div>
+                          </div>
+                          
+                          {editingNoteId === note.id ? (
+                            <div className="space-y-2">
+                              <textarea
+                                value={editingNoteText}
+                                onChange={(e) => setEditingNoteText(e.target.value)}
+                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 min-h-[80px] resize-y text-sm"
+                                disabled={savingNote}
+                              />
+                              <div className="flex justify-end gap-2">
+                                <button
+                                  onClick={() => {
+                                    setEditingNoteId(null)
+                                    setEditingNoteText('')
+                                  }}
+                                  className="px-3 py-1 text-sm bg-gray-200 text-gray-700 rounded hover:bg-gray-300 transition-colors"
+                                  disabled={savingNote}
+                                >
+                                  Cancel
+                                </button>
+                                <button
+                                  onClick={() => updateAppointmentNote(note.id, editingNoteText)}
+                                  disabled={!editingNoteText.trim() || savingNote}
+                                  className="px-3 py-1 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 disabled:bg-gray-400 transition-colors"
+                                >
+                                  {savingNote ? 'Saving...' : 'Save'}
+                                </button>
+                              </div>
+                            </div>
+                          ) : (
+                            <p className="text-sm text-gray-700 whitespace-pre-wrap">{note.note_text}</p>
+                          )}
+                          
+                          <div className="mt-2 flex items-center gap-4 text-xs text-gray-500">
+                            <span className="flex items-center gap-1">
+                              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                              </svg>
+                              {formatDate(note.created_at)} at {formatTime(note.created_at)}
+                            </span>
+                            {note.updated_at !== note.created_at && (
+                              <span className="italic">(edited)</span>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
