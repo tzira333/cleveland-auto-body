@@ -179,7 +179,7 @@ export default function StaffNavigation() {
             </div>
           )}
 
-          {/* BodyShop CRM Card */}
+          {/* BodyShop Workflow Card */}
           {staffUser.can_access_crm && (
             <div
               onClick={() => router.push('/admin/staff/crm')}
@@ -202,7 +202,7 @@ export default function StaffNavigation() {
                   </svg>
                 </div>
                 <h3 className="text-2xl font-bold text-center">
-                  BodyShop CRM
+                  BodyShop Workflow
                 </h3>
               </div>
               <div className="p-6">
@@ -231,7 +231,7 @@ export default function StaffNavigation() {
                 </ul>
                 <div className="mt-6">
                   <div className="bg-green-50 text-green-700 px-4 py-2 rounded-lg text-center font-medium group-hover:bg-green-100 transition-colors">
-                    Enter BodyShop CRM →
+                    Enter BodyShop Workflow →
                   </div>
                 </div>
               </div>

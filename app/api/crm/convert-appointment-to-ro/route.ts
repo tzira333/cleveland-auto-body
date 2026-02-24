@@ -249,7 +249,7 @@ export async function POST(request: NextRequest) {
         status: 'intake',
         priority: 'medium',
         date_received: new Date().toISOString(),
-        damage_description: repairCase?.incident_description || appointment.notes || 'Appointment conversion - details pending',
+        damage_description: repairCase?.incident_description || appointment.damage_description || appointment.notes || 'Appointment conversion - details pending',
         
         // Customer info (denormalized for quick access)
         customer_first_name: firstName,
@@ -270,6 +270,12 @@ export async function POST(request: NextRequest) {
         insurance_contact_name: repairCase?.insurance_adjuster_name || customer.insurance_adjuster_name,
         insurance_contact_phone: repairCase?.insurance_adjuster_phone || customer.insurance_adjuster_phone,
         insurance_contact_email: repairCase?.insurance_adjuster_email || customer.insurance_adjuster_email,
+        
+        // COPY ALL APPOINTMENT DETAILS
+        appointment_id: appointment.id,
+        original_service_type: appointment.service_type,
+        original_appointment_date: appointment.appointment_date,
+        original_appointment_time: appointment.appointment_time,
         
         // Estimates
         estimated_total_cost: null,

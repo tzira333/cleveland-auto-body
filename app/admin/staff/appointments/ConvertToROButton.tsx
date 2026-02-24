@@ -79,7 +79,7 @@ export default function ConvertToROButton({
               Convert to Repair Order?
             </h3>
             <p className="text-gray-600 mb-6">
-              This will create a new Repair Order in the BodyShop CRM with all customer information, 
+              This will create a new Repair Order in the BodyShop Workflow with all customer information, 
               vehicle details, insurance data, and any uploaded documents from this appointment.
             </p>
             {error && (
