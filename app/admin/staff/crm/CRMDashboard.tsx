@@ -4,8 +4,9 @@ import { useState, useEffect } from 'react'
 import { createBrowserClient } from '@supabase/ssr'
 import { useRouter } from 'next/navigation'
 import CreateRepairOrderForm from './CreateRepairOrderForm'
+import EditRepairOrderModal from './EditRepairOrderModal'
 
-type ViewType = 'dashboard' | 'repair-orders' | 'customers' | 'parts' | 'reports'
+type ViewType = 'dashboard' | 'repair-orders' | 'archived-ros' | 'customers' | 'parts' | 'reports'
 
 interface RepairOrder {
   id: string
@@ -17,14 +18,24 @@ interface RepairOrder {
   customer_id: string
   vehicle_id: string
   damage_description: string
+  archived: boolean
+  archived_at?: string
+  customer_first_name?: string
+  customer_last_name?: string
+  vehicle_year?: string
+  vehicle_make?: string
+  vehicle_model?: string
 }
 
 export default function CRMDashboard() {
   const router = useRouter()
   const [currentView, setCurrentView] = useState<ViewType>('dashboard')
   const [repairOrders, setRepairOrders] = useState<RepairOrder[]>([])
+  const [archivedROs, setArchivedROs] = useState<RepairOrder[]>([])
   const [loading, setLoading] = useState(true)
   const [showCreateROForm, setShowCreateROForm] = useState(false)
+  const [selectedRO, setSelectedRO] = useState<RepairOrder | null>(null)
+  const [showEditModal, setShowEditModal] = useState(false)
 
   const supabase = createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -37,13 +48,25 @@ export default function CRMDashboard() {
 
   const loadData = async () => {
     try {
+      // Load active (non-archived) repair orders
       const { data, error } = await supabase
         .from('crm_repair_orders')
         .select('*')
+        .or('archived.is.null,archived.eq.false')
         .order('date_received', { ascending: false })
 
       if (error) throw error
       setRepairOrders(data || [])
+
+      // Load archived repair orders
+      const { data: archivedData, error: archivedError } = await supabase
+        .from('crm_repair_orders')
+        .select('*')
+        .eq('archived', true)
+        .order('archived_at', { ascending: false })
+
+      if (archivedError) throw archivedError
+      setArchivedROs(archivedData || [])
     } catch (error) {
       console.error('Error loading data:', error)
     } finally {
@@ -82,10 +105,72 @@ export default function CRMDashboard() {
     return colors[priority] || 'text-gray-600'
   }
 
+  const archiveRepairOrder = async (roId: string) => {
+    if (!confirm('Archive this repair order? It will be moved to the archived section.')) return
+
+    try {
+      const response = await fetch('/api/crm/repair-orders/archive', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ro_id: roId })
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        alert(data.error || 'Failed to archive repair order')
+        return
+      }
+
+      alert('Repair order archived successfully')
+      loadData()
+    } catch (error) {
+      console.error('Error archiving RO:', error)
+      alert('Failed to archive repair order')
+    }
+  }
+
+  const unarchiveRepairOrder = async (roId: string) => {
+    if (!confirm('Restore this repair order from archive?')) return
+
+    try {
+      const response = await fetch('/api/crm/repair-orders/archive', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ro_id: roId })
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        alert(data.error || 'Failed to restore repair order')
+        return
+      }
+
+      alert('Repair order restored successfully')
+      loadData()
+    } catch (error) {
+      console.error('Error restoring RO:', error)
+      alert('Failed to restore repair order')
+    }
+  }
+
+  const handleEditRO = (ro: RepairOrder) => {
+    setSelectedRO(ro)
+    setShowEditModal(true)
+  }
+
+  const handleEditSave = () => {
+    setShowEditModal(false)
+    setSelectedRO(null)
+    loadData()
+  }
+
   const statusCounts = {
     active: repairOrders.filter(ro => ro.status !== 'completed').length,
     overdue: repairOrders.filter(ro => ro.estimated_completion && new Date(ro.estimated_completion) < new Date() && ro.status !== 'completed').length,
-    ready: repairOrders.filter(ro => ro.status === 'ready_pickup').length
+    ready: repairOrders.filter(ro => ro.status === 'ready_pickup').length,
+    archived: archivedROs.length
   }
 
   return (
@@ -130,8 +215,9 @@ export default function CRMDashboard() {
             {[
               { id: 'dashboard' as ViewType, label: 'Dashboard', icon: '📊' },
               { id: 'repair-orders' as ViewType, label: 'Repair Orders', icon: '📋' },
+              { id: 'archived-ros' as ViewType, label: 'Archived ROs', icon: '📦' },
               { id: 'customers' as ViewType, label: 'Customers', icon: '👥' },
-              { id: 'parts' as ViewType, label: 'Parts', icon: '📦' },
+              { id: 'parts' as ViewType, label: 'Parts', icon: '🔧' },
               { id: 'reports' as ViewType, label: 'Reports', icon: '📈' }
             ].map((item) => (
               <button
@@ -212,6 +298,20 @@ export default function CRMDashboard() {
                   </div>
                 </div>
               </div>
+
+              <div className="bg-white p-6 rounded-lg shadow">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-gray-600">Archived</p>
+                    <p className="text-3xl font-bold text-gray-600 mt-2">{statusCounts.archived}</p>
+                  </div>
+                  <div className="bg-gray-100 p-3 rounded-full">
+                    <svg className="w-8 h-8 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
+                    </svg>
+                  </div>
+                </div>
+              </div>
             </div>
 
             {/* Recent Repair Orders */}
@@ -228,18 +328,19 @@ export default function CRMDashboard() {
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Priority</th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date Received</th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Est. Completion</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
                     {loading ? (
                       <tr>
-                        <td colSpan={5} className="px-6 py-8 text-center text-gray-500">
+                        <td colSpan={6} className="px-6 py-8 text-center text-gray-500">
                           Loading...
                         </td>
                       </tr>
                     ) : repairOrders.length === 0 ? (
                       <tr>
-                        <td colSpan={5} className="px-6 py-8 text-center text-gray-500">
+                        <td colSpan={6} className="px-6 py-8 text-center text-gray-500">
                           No repair orders yet. Create your first repair order to get started.
                         </td>
                       </tr>
@@ -266,6 +367,15 @@ export default function CRMDashboard() {
                             {ro.estimated_completion
                               ? new Date(ro.estimated_completion).toLocaleDateString()
                               : 'Not set'}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm">
+                            <button
+                              onClick={() => handleEditRO(ro)}
+                              className="text-blue-600 hover:text-blue-800 mr-3"
+                              title="View/Edit"
+                            >
+                              View
+                            </button>
                           </td>
                         </tr>
                       ))
@@ -320,18 +430,19 @@ export default function CRMDashboard() {
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Priority</th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
                     {loading ? (
                       <tr>
-                        <td colSpan={6} className="px-6 py-8 text-center text-gray-500">
+                        <td colSpan={7} className="px-6 py-8 text-center text-gray-500">
                           Loading...
                         </td>
                       </tr>
                     ) : repairOrders.length === 0 ? (
                       <tr>
-                        <td colSpan={6} className="px-6 py-8 text-center text-gray-500">
+                        <td colSpan={7} className="px-6 py-8 text-center text-gray-500">
                           No repair orders yet. Click "Create New Repair Order" to get started.
                         </td>
                       </tr>
@@ -342,10 +453,14 @@ export default function CRMDashboard() {
                             {ro.ro_number}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                            {ro.customer_id.substring(0, 8)}...
+                            {ro.customer_first_name && ro.customer_last_name 
+                              ? `${ro.customer_first_name} ${ro.customer_last_name}`
+                              : ro.customer_id.substring(0, 8) + '...'}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                            {ro.vehicle_id.substring(0, 8)}...
+                            {ro.vehicle_year && ro.vehicle_make && ro.vehicle_model
+                              ? `${ro.vehicle_year} ${ro.vehicle_make} ${ro.vehicle_model}`
+                              : ro.vehicle_id.substring(0, 8) + '...'}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
                             <span className={`px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(ro.status)}`}>
@@ -360,6 +475,26 @@ export default function CRMDashboard() {
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                             {new Date(ro.date_received).toLocaleDateString()}
                           </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm space-x-2">
+                            <button
+                              onClick={() => handleEditRO(ro)}
+                              className="text-blue-600 hover:text-blue-800"
+                              title="View/Edit"
+                            >
+                              <svg className="w-5 h-5 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                              </svg>
+                            </button>
+                            <button
+                              onClick={() => archiveRepairOrder(ro.id)}
+                              className="text-gray-600 hover:text-gray-800"
+                              title="Archive"
+                            >
+                              <svg className="w-5 h-5 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
+                              </svg>
+                            </button>
+                          </td>
                         </tr>
                       ))
                     )}
@@ -370,7 +505,99 @@ export default function CRMDashboard() {
           </div>
         )}
 
-        {currentView !== 'dashboard' && currentView !== 'repair-orders' && (
+        {currentView === 'archived-ros' && (
+          <div>
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-2xl font-bold text-gray-900">Archived Repair Orders</h2>
+              <div className="text-sm text-gray-600">
+                {archivedROs.length} archived order{archivedROs.length !== 1 ? 's' : ''}
+              </div>
+            </div>
+
+            <div className="bg-white rounded-lg shadow">
+              <div className="overflow-x-auto">
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">RO#</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Customer</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Vehicle</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Archived Date</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {loading ? (
+                      <tr>
+                        <td colSpan={6} className="px-6 py-8 text-center text-gray-500">
+                          Loading...
+                        </td>
+                      </tr>
+                    ) : archivedROs.length === 0 ? (
+                      <tr>
+                        <td colSpan={6} className="px-6 py-8 text-center text-gray-500">
+                          No archived repair orders.
+                        </td>
+                      </tr>
+                    ) : (
+                      archivedROs.map((ro) => (
+                        <tr key={ro.id} className="hover:bg-gray-50">
+                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-600">
+                            {ro.ro_number}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                            {ro.customer_first_name && ro.customer_last_name 
+                              ? `${ro.customer_first_name} ${ro.customer_last_name}`
+                              : ro.customer_id.substring(0, 8) + '...'}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                            {ro.vehicle_year && ro.vehicle_make && ro.vehicle_model
+                              ? `${ro.vehicle_year} ${ro.vehicle_make} ${ro.vehicle_model}`
+                              : ro.vehicle_id.substring(0, 8) + '...'}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <span className={`px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(ro.status)}`}>
+                              {ro.status.replace(/_/g, ' ').toUpperCase()}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            {ro.archived_at
+                              ? new Date(ro.archived_at).toLocaleDateString()
+                              : 'N/A'}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm space-x-2">
+                            <button
+                              onClick={() => handleEditRO(ro)}
+                              className="text-blue-600 hover:text-blue-800"
+                              title="View Details"
+                            >
+                              <svg className="w-5 h-5 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                              </svg>
+                            </button>
+                            <button
+                              onClick={() => unarchiveRepairOrder(ro.id)}
+                              className="text-green-600 hover:text-green-800"
+                              title="Restore from Archive"
+                            >
+                              <svg className="w-5 h-5 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                              </svg>
+                            </button>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {currentView !== 'dashboard' && currentView !== 'repair-orders' && currentView !== 'archived-ros' && (
           <div className="bg-white rounded-lg shadow p-12">
             <div className="text-center text-gray-500">
               <svg className="w-24 h-24 mx-auto text-gray-300 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -389,6 +616,18 @@ export default function CRMDashboard() {
           </div>
         )}
       </main>
+
+      {/* Edit RO Modal */}
+      {showEditModal && selectedRO && (
+        <EditRepairOrderModal
+          repairOrder={selectedRO}
+          onClose={() => {
+            setShowEditModal(false)
+            setSelectedRO(null)
+          }}
+          onSave={handleEditSave}
+        />
+      )}
     </div>
   )
 }

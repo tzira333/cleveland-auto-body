@@ -38,6 +38,8 @@ interface Appointment {
   status: string
   created_at: string
   updated_at: string
+  archived?: boolean
+  archived_at?: string
   files?: AppointmentFile[]
   notes?: AppointmentNote[]
 }
@@ -45,6 +47,8 @@ interface Appointment {
 export default function StaffDashboard() {
   const router = useRouter()
   const [appointments, setAppointments] = useState<Appointment[]>([])
+  const [archivedAppointments, setArchivedAppointments] = useState<Appointment[]>([])
+  const [showArchived, setShowArchived] = useState(false)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null)
@@ -71,12 +75,23 @@ export default function StaffDashboard() {
       setLoading(true)
       setError('')
 
+      // Fetch active (non-archived) appointments
       const { data, error: fetchError } = await supabase
         .from('appointments')
         .select('*')
+        .or('archived.is.null,archived.eq.false')
         .order('created_at', { ascending: false })
 
       if (fetchError) throw fetchError
+
+      // Fetch archived appointments
+      const { data: archivedData, error: archivedError } = await supabase
+        .from('appointments')
+        .select('*')
+        .eq('archived', true)
+        .order('archived_at', { ascending: false })
+
+      if (archivedError) throw archivedError
 
       // Fetch files for each appointment
       const appointmentsWithFiles = await Promise.all(
@@ -101,7 +116,29 @@ export default function StaffDashboard() {
         })
       )
 
+      // Fetch files for archived appointments
+      const archivedWithFiles = await Promise.all(
+        (archivedData || []).map(async (appointment) => {
+          try {
+            const { data: files, error: filesError } = await supabase
+              .from('appointment_files')
+              .select('*')
+              .eq('appointment_id', appointment.id)
+              .order('created_at', { ascending: false })
+
+            if (filesError) {
+              return { ...appointment, files: [] }
+            }
+
+            return { ...appointment, files: files || [] }
+          } catch (err) {
+            return { ...appointment, files: [] }
+          }
+        })
+      )
+
       setAppointments(appointmentsWithFiles)
+      setArchivedAppointments(archivedWithFiles)
     } catch (err) {
       console.error('Error fetching appointments:', err)
       setError('Failed to load appointments')
@@ -224,6 +261,58 @@ export default function StaffDashboard() {
     } catch (err) {
       console.error('Error deleting note:', err)
       alert('Failed to delete note')
+    }
+  }
+
+  const archiveAppointment = async (appointmentId: string) => {
+    if (!confirm('Archive this appointment? It will be moved to the archived section.')) return
+
+    try {
+      const response = await fetch('/api/appointments/archive', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ appointment_id: appointmentId })
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        alert(data.error || 'Failed to archive appointment')
+        return
+      }
+
+      alert('Appointment archived successfully')
+      fetchAppointments()
+      setSelectedAppointment(null)
+    } catch (error) {
+      console.error('Error archiving appointment:', error)
+      alert('Failed to archive appointment')
+    }
+  }
+
+  const unarchiveAppointment = async (appointmentId: string) => {
+    if (!confirm('Restore this appointment from archive?')) return
+
+    try {
+      const response = await fetch('/api/appointments/archive', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ appointment_id: appointmentId })
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        alert(data.error || 'Failed to restore appointment')
+        return
+      }
+
+      alert('Appointment restored successfully')
+      fetchAppointments()
+      setSelectedAppointment(null)
+    } catch (error) {
+      console.error('Error restoring appointment:', error)
+      alert('Failed to restore appointment')
     }
   }
 
@@ -374,7 +463,7 @@ export default function StaffDashboard() {
         </div>
 
         {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+        <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6">
           <div className="bg-white p-4 rounded-lg shadow">
             <div className="text-sm text-gray-600">Total Appointments</div>
             <div className="text-2xl font-bold text-gray-900">{appointments.length}</div>
@@ -397,13 +486,45 @@ export default function StaffDashboard() {
               {appointments.filter(a => a.status === 'in-progress').length}
             </div>
           </div>
+          <div className="bg-white p-4 rounded-lg shadow">
+            <div className="text-sm text-gray-600">Archived</div>
+            <div className="text-2xl font-bold text-gray-600">
+              {archivedAppointments.length}
+            </div>
+          </div>
+        </div>
+
+        {/* Tabs */}
+        <div className="mb-6 border-b border-gray-200">
+          <nav className="-mb-px flex space-x-8">
+            <button
+              onClick={() => setShowArchived(false)}
+              className={`${
+                !showArchived
+                  ? 'border-blue-500 text-blue-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors`}
+            >
+              Active Appointments ({appointments.length})
+            </button>
+            <button
+              onClick={() => setShowArchived(true)}
+              className={`${
+                showArchived
+                  ? 'border-blue-500 text-blue-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors`}
+            >
+              Archived Appointments ({archivedAppointments.length})
+            </button>
+          </nav>
         </div>
 
         {/* Appointments Table */}
         <div className="bg-white rounded-lg shadow overflow-hidden">
           <div className="px-6 py-4 border-b border-gray-200">
             <h2 className="text-lg font-semibold text-gray-900">
-              Appointments ({filteredAppointments.length})
+              {showArchived ? 'Archived Appointments' : 'Active Appointments'} ({showArchived ? archivedAppointments.length : filteredAppointments.length})
             </h2>
           </div>
 
@@ -415,6 +536,82 @@ export default function StaffDashboard() {
             <div className="p-8 text-center text-red-600">
               {error}
             </div>
+          ) : showArchived ? (
+            archivedAppointments.length === 0 ? (
+              <div className="p-8 text-center text-gray-500">
+                No archived appointments found
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Customer
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Contact
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Service
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Status
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Archived Date
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Actions
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {archivedAppointments.map((appointment) => (
+                      <tr key={appointment.id} className="hover:bg-gray-50">
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="text-sm font-medium text-gray-900">
+                            {appointment.customer_name}
+                          </div>
+                        </td>
+                        <td className="px-6 py-4">
+                          <div className="text-sm text-gray-900">{appointment.customer_phone}</div>
+                          <div className="text-xs text-gray-500">{appointment.customer_email}</div>
+                        </td>
+                        <td className="px-6 py-4">
+                          <span className="text-sm text-gray-900">{appointment.service_type}</span>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${getStatusBadgeColor(appointment.status)}`}>
+                            {appointment.status}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                          {appointment.archived_at ? formatDate(appointment.archived_at) : 'N/A'}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm space-x-2">
+                          <button
+                            onClick={() => {
+                              setSelectedAppointment(appointment)
+                              fetchAppointmentNotes(appointment.id)
+                            }}
+                            className="text-blue-600 hover:text-blue-800 font-medium"
+                          >
+                            View
+                          </button>
+                          <button
+                            onClick={() => unarchiveAppointment(appointment.id)}
+                            className="text-green-600 hover:text-green-800 font-medium"
+                          >
+                            Restore
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )
           ) : filteredAppointments.length === 0 ? (
             <div className="p-8 text-center text-gray-500">
               No appointments found
@@ -497,6 +694,15 @@ export default function StaffDashboard() {
                               onSuccess={fetchAppointments}
                             />
                           )}
+                          <button
+                            onClick={() => archiveAppointment(appointment.id)}
+                            className="text-gray-600 hover:text-gray-900 p-1 rounded hover:bg-gray-50 transition-colors"
+                            title="Archive appointment"
+                          >
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
+                            </svg>
+                          </button>
                           <button
                             onClick={() => deleteAppointment(appointment.id)}
                             className="text-red-600 hover:text-red-900 p-1 rounded hover:bg-red-50 transition-colors"
