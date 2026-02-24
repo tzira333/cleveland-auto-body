@@ -3,7 +3,7 @@ import StaffAuthCheck from '../StaffAuthCheck'
 import CRMDashboard from './CRMDashboard'
 
 export const metadata: Metadata = {
-  title: 'BodyShop CRM | Staff Portal',
+  title: 'BodyShop Workflow | Staff Portal',
   description: 'Complete repair workflow management system',
 }
 

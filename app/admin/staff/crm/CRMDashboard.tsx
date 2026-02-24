@@ -106,7 +106,7 @@ export default function CRMDashboard() {
               </button>
               <div>
                 <h1 className="text-2xl font-bold text-gray-900">
-                  BodyShop CRM - Workflow Management
+                  BodyShop Workflow - Repair Management
                 </h1>
                 <p className="text-sm text-gray-600 mt-1">
                   Complete repair tracking system
@@ -380,7 +380,7 @@ export default function CRMDashboard() {
                 {currentView.charAt(0).toUpperCase() + currentView.slice(1).replace(/-/g, ' ')} View
               </h3>
               <p className="text-gray-600 mb-4">
-                This section is ready for implementation. The full CRM features will be built out based on your specific workflow needs.
+                This section is ready for implementation. The full workflow features will be built out based on your specific needs.
               </p>
               <p className="text-sm text-gray-500">
                 Available features: Customer Management, Vehicle Tracking, Parts Inventory, Time Tracking, Documents, and Reports
