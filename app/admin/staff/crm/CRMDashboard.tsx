@@ -324,6 +324,8 @@ export default function CRMDashboard() {
                   <thead className="bg-gray-50">
                     <tr>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">RO#</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Customer</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Vehicle</th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Priority</th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date Received</th>
@@ -334,13 +336,13 @@ export default function CRMDashboard() {
                   <tbody className="bg-white divide-y divide-gray-200">
                     {loading ? (
                       <tr>
-                        <td colSpan={6} className="px-6 py-8 text-center text-gray-500">
+                        <td colSpan={8} className="px-6 py-8 text-center text-gray-500">
                           Loading...
                         </td>
                       </tr>
                     ) : repairOrders.length === 0 ? (
                       <tr>
-                        <td colSpan={6} className="px-6 py-8 text-center text-gray-500">
+                        <td colSpan={8} className="px-6 py-8 text-center text-gray-500">
                           No repair orders yet. Create your first repair order to get started.
                         </td>
                       </tr>
@@ -349,6 +351,16 @@ export default function CRMDashboard() {
                         <tr key={ro.id} className="hover:bg-gray-50">
                           <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                             {ro.ro_number}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                            {ro.customer_first_name && ro.customer_last_name 
+                              ? `${ro.customer_first_name} ${ro.customer_last_name}`
+                              : ro.customer_id.substring(0, 8) + '...'}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                            {ro.vehicle_year && ro.vehicle_make && ro.vehicle_model
+                              ? `${ro.vehicle_year} ${ro.vehicle_make} ${ro.vehicle_model}`
+                              : ro.vehicle_id.substring(0, 8) + '...'}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
                             <span className={`px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(ro.status)}`}>
