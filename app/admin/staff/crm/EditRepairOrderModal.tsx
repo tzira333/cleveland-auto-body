@@ -15,6 +15,14 @@ export default function EditRepairOrderModal({
 }: EditRepairOrderModalProps) {
   const [formData, setFormData] = useState({
     ro_number: repairOrder.ro_number || '',
+    customer_first_name: repairOrder.customer_first_name || '',
+    customer_last_name: repairOrder.customer_last_name || '',
+    customer_phone: repairOrder.customer_phone || '',
+    customer_email: repairOrder.customer_email || '',
+    vehicle_year: repairOrder.vehicle_year || '',
+    vehicle_make: repairOrder.vehicle_make || '',
+    vehicle_model: repairOrder.vehicle_model || '',
+    vehicle_vin: repairOrder.vehicle_vin || '',
     status: repairOrder.status || 'intake',
     priority: repairOrder.priority || 'medium',
     estimated_completion: repairOrder.estimated_completion?.split('T')[0] || '',
@@ -95,6 +103,141 @@ export default function EditRepairOrderModal({
             <p className="text-xs text-gray-500 mt-1">
               You can change the RO number to any unique identifier
             </p>
+          </div>
+
+          {/* Customer Information Section */}
+          <div className="border-t pt-4 mt-4">
+            <h4 className="text-md font-semibold text-gray-800 mb-3">Customer Information</h4>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* Customer First Name */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  First Name
+                </label>
+                <input
+                  type="text"
+                  value={formData.customer_first_name}
+                  onChange={(e) => setFormData({ ...formData, customer_first_name: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  disabled={saving}
+                  placeholder="John"
+                />
+              </div>
+
+              {/* Customer Last Name */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Last Name
+                </label>
+                <input
+                  type="text"
+                  value={formData.customer_last_name}
+                  onChange={(e) => setFormData({ ...formData, customer_last_name: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  disabled={saving}
+                  placeholder="Smith"
+                />
+              </div>
+
+              {/* Customer Phone */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Phone
+                </label>
+                <input
+                  type="tel"
+                  value={formData.customer_phone}
+                  onChange={(e) => setFormData({ ...formData, customer_phone: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  disabled={saving}
+                  placeholder="(555) 123-4567"
+                />
+              </div>
+
+              {/* Customer Email */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Email
+                </label>
+                <input
+                  type="email"
+                  value={formData.customer_email}
+                  onChange={(e) => setFormData({ ...formData, customer_email: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  disabled={saving}
+                  placeholder="john.smith@example.com"
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Vehicle Information Section */}
+          <div className="border-t pt-4 mt-4">
+            <h4 className="text-md font-semibold text-gray-800 mb-3">Vehicle Information</h4>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* Vehicle Year */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Year
+                </label>
+                <input
+                  type="text"
+                  value={formData.vehicle_year}
+                  onChange={(e) => setFormData({ ...formData, vehicle_year: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  disabled={saving}
+                  placeholder="2020"
+                />
+              </div>
+
+              {/* Vehicle Make */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Make
+                </label>
+                <input
+                  type="text"
+                  value={formData.vehicle_make}
+                  onChange={(e) => setFormData({ ...formData, vehicle_make: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  disabled={saving}
+                  placeholder="Honda"
+                />
+              </div>
+
+              {/* Vehicle Model */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Model
+                </label>
+                <input
+                  type="text"
+                  value={formData.vehicle_model}
+                  onChange={(e) => setFormData({ ...formData, vehicle_model: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  disabled={saving}
+                  placeholder="Civic"
+                />
+              </div>
+
+              {/* Vehicle VIN */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  VIN
+                </label>
+                <input
+                  type="text"
+                  value={formData.vehicle_vin}
+                  onChange={(e) => setFormData({ ...formData, vehicle_vin: e.target.value.toUpperCase() })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 font-mono"
+                  disabled={saving}
+                  placeholder="1HGBH41JXMN109186"
+                  maxLength={17}
+                />
+              </div>
+            </div>
           </div>
 
           {/* Status */}
