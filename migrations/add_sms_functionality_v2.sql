@@ -1,7 +1,7 @@
--- SMS Functionality Database Schema
+-- SMS Functionality Database Schema (Updated Version)
 -- Run this in Supabase SQL Editor
 
--- 1. Staff SMS notification settings table
+-- 1. Staff SMS notification settings table (UPDATED with staff_email)
 CREATE TABLE IF NOT EXISTS staff_sms_settings (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   staff_email TEXT NOT NULL UNIQUE,
@@ -167,4 +167,3 @@ SELECT template_name, template_type, description FROM sms_templates ORDER BY tem
 SELECT staff_email, staff_name, phone_number, notify_new_appointments, notify_new_tow_requests, is_active 
 FROM staff_sms_settings 
 ORDER BY staff_name;
-
