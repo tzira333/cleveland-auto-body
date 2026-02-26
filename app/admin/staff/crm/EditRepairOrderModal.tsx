@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import SendSMSButton from './SendSMSButton'
 
 interface EditRepairOrderModalProps {
   repairOrder: any
@@ -67,7 +68,7 @@ export default function EditRepairOrderModal({
     <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
       <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
         <div className="p-6 border-b sticky top-0 bg-white">
-          <div className="flex justify-between items-center">
+          <div className="flex justify-between items-center mb-3">
             <h3 className="text-xl font-semibold text-gray-900">Edit Repair Order</h3>
             <button
               onClick={onClose}
@@ -76,6 +77,16 @@ export default function EditRepairOrderModal({
             >
               &times;
             </button>
+          </div>
+          {/* Send SMS Button */}
+          <div className="flex justify-end">
+            <SendSMSButton
+              customerPhone={formData.customer_phone}
+              customerName={`${formData.customer_first_name} ${formData.customer_last_name}`.trim() || 'Customer'}
+              roNumber={formData.ro_number}
+              roId={repairOrder.id}
+              vehicleInfo={[formData.vehicle_year, formData.vehicle_make, formData.vehicle_model].filter(Boolean).join(' ') || 'vehicle'}
+            />
           </div>
         </div>
 

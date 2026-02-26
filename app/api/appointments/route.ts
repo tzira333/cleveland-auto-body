@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import { NextRequest, NextResponse } from 'next/server';
+import { notifyStaffNewAppointment } from '@/lib/smsNotifications';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
@@ -220,6 +221,14 @@ export async function POST(request: NextRequest) {
           console.error(`Error processing file ${i}:`, fileError);
         }
       }
+    }
+
+    // Send SMS notification to staff (non-blocking)
+    try {
+      await notifyStaffNewAppointment(appointment);
+    } catch (smsError) {
+      console.error('Error sending SMS notification:', smsError);
+      // Don't fail the appointment creation if SMS fails
     }
 
     return NextResponse.json({

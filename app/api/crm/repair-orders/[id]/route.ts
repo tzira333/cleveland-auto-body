@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import { NextRequest, NextResponse } from 'next/server';
+import { notifyCustomerROStatusChange } from '@/lib/smsNotifications';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
@@ -132,6 +133,16 @@ export async function PUT(
         if (historyError) {
           console.warn('Failed to log edit history:', historyError);
           // Don't fail the update if history logging fails
+        }
+      }
+      
+      // Send SMS notification if status changed
+      if (roUpdates.status && roUpdates.status !== currentRO.status) {
+        try {
+          await notifyCustomerROStatusChange(data, roUpdates.status);
+        } catch (smsError) {
+          console.error('Error sending SMS notification:', smsError);
+          // Don't fail the update if SMS fails
         }
       }
     }
