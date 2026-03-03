@@ -215,14 +215,14 @@ SELECT
   -- Countdown to absolute_end_date (in days)
   CASE 
     WHEN ro.absolute_end_date IS NOT NULL THEN
-      EXTRACT(DAY FROM (ro.absolute_end_date - NOW()::DATE))::INTEGER
+      (ro.absolute_end_date - NOW()::DATE)::INTEGER
     ELSE NULL
   END as days_until_deadline,
   
   -- 20-day warning countdown (starts at RO creation + absolute_end_date - 20 days)
   CASE 
     WHEN ro.absolute_end_date IS NOT NULL THEN
-      EXTRACT(DAY FROM (ro.absolute_end_date - NOW()::DATE))::INTEGER
+      (ro.absolute_end_date - NOW()::DATE)::INTEGER
     ELSE NULL
   END as countdown_days,
   
