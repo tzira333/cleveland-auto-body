@@ -348,7 +348,11 @@ export default function CRMDashboard() {
                       </tr>
                     ) : (
                       repairOrders.slice(0, 10).map((ro) => (
-                        <tr key={ro.id} className="hover:bg-gray-50">
+                        <tr 
+                          key={ro.id} 
+                          onClick={() => handleEditRO(ro)}
+                          className="hover:bg-gray-50 cursor-pointer"
+                        >
                           <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                             {ro.ro_number}
                           </td>
@@ -382,7 +386,10 @@ export default function CRMDashboard() {
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm">
                             <button
-                              onClick={() => handleEditRO(ro)}
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                handleEditRO(ro)
+                              }}
                               className="text-blue-600 hover:text-blue-800 mr-3"
                               title="View/Edit"
                             >
@@ -460,7 +467,11 @@ export default function CRMDashboard() {
                       </tr>
                     ) : (
                       repairOrders.map((ro) => (
-                        <tr key={ro.id} className="hover:bg-gray-50">
+                        <tr 
+                          key={ro.id} 
+                          onClick={() => handleEditRO(ro)}
+                          className="hover:bg-gray-50 cursor-pointer"
+                        >
                           <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-blue-600">
                             {ro.ro_number}
                           </td>
@@ -489,7 +500,10 @@ export default function CRMDashboard() {
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm space-x-2">
                             <button
-                              onClick={() => handleEditRO(ro)}
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                handleEditRO(ro)
+                              }}
                               className="text-blue-600 hover:text-blue-800"
                               title="View/Edit"
                             >
@@ -554,7 +568,11 @@ export default function CRMDashboard() {
                       </tr>
                     ) : (
                       archivedROs.map((ro) => (
-                        <tr key={ro.id} className="hover:bg-gray-50">
+                        <tr 
+                          key={ro.id} 
+                          onClick={() => handleEditRO(ro)}
+                          className="hover:bg-gray-50 cursor-pointer"
+                        >
                           <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-600">
                             {ro.ro_number}
                           </td>
@@ -580,7 +598,10 @@ export default function CRMDashboard() {
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm space-x-2">
                             <button
-                              onClick={() => handleEditRO(ro)}
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                handleEditRO(ro)
+                              }}
                               className="text-blue-600 hover:text-blue-800"
                               title="View Details"
                             >
@@ -590,7 +611,10 @@ export default function CRMDashboard() {
                               </svg>
                             </button>
                             <button
-                              onClick={() => unarchiveRepairOrder(ro.id)}
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                unarchiveRepairOrder(ro.id)
+                              }}
                               className="text-green-600 hover:text-green-800"
                               title="Restore from Archive"
                             >
