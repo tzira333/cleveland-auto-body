@@ -5,6 +5,7 @@ import { createBrowserClient } from '@supabase/ssr'
 import { useRouter } from 'next/navigation'
 import CreateRepairOrderForm from './CreateRepairOrderForm'
 import EditRepairOrderModal from './EditRepairOrderModal'
+import { useAuth } from '@/hooks/useAuth'
 
 type ViewType = 'dashboard' | 'repair-orders' | 'archived-ros' | 'customers' | 'parts' | 'reports'
 
@@ -31,6 +32,7 @@ interface RepairOrder {
 
 export default function CRMDashboard() {
   const router = useRouter()
+  const { user, isAdmin } = useAuth()
   const [currentView, setCurrentView] = useState<ViewType>('dashboard')
   const [repairOrders, setRepairOrders] = useState<RepairOrder[]>([])
   const [archivedROs, setArchivedROs] = useState<RepairOrder[]>([])
@@ -61,21 +63,23 @@ export default function CRMDashboard() {
 
   const loadData = async () => {
     try {
-      // Load active (non-archived) repair orders
+      // Load active (non-archived, non-deleted) repair orders
       const { data, error } = await supabase
         .from('crm_repair_orders')
         .select('*')
         .or('archived.is.null,archived.eq.false')
+        .is('deleted_at', null)
         .order('date_received', { ascending: false })
 
       if (error) throw error
       setRepairOrders(data || [])
 
-      // Load archived repair orders
+      // Load archived (non-deleted) repair orders
       const { data: archivedData, error: archivedError } = await supabase
         .from('crm_repair_orders')
         .select('*')
         .eq('archived', true)
+        .is('deleted_at', null)
         .order('archived_at', { ascending: false })
 
       if (archivedError) throw archivedError
@@ -165,6 +169,45 @@ export default function CRMDashboard() {
     } catch (error) {
       console.error('Error restoring RO:', error)
       alert('Failed to restore repair order')
+    }
+  }
+
+  // Delete repair order (Admin only - soft delete)
+  const deleteRepairOrder = async (roId: string) => {
+    if (!isAdmin) {
+      alert('Only administrators can delete repair orders')
+      return
+    }
+
+    if (!confirm('⚠️ PERMANENTLY DELETE this repair order?\n\nThis action CANNOT be undone!\n\nAll associated data will be soft-deleted and can only be restored by database administrators.')) return
+
+    if (!user?.email) {
+      alert('User email not found')
+      return
+    }
+
+    try {
+      const response = await fetch(`/api/crm/repair-orders/${roId}`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          action: 'delete',
+          deleted_by: user.email 
+        })
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        alert(data.error || 'Failed to delete repair order')
+        return
+      }
+
+      alert('Repair order deleted successfully')
+      loadData()
+    } catch (error) {
+      console.error('Error deleting RO:', error)
+      alert('Failed to delete repair order')
     }
   }
 
@@ -744,7 +787,10 @@ export default function CRMDashboard() {
                               </svg>
                             </button>
                             <button
-                              onClick={() => archiveRepairOrder(ro.id)}
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                archiveRepairOrder(ro.id)
+                              }}
                               className="text-gray-600 hover:text-gray-800"
                               title="Archive"
                             >
@@ -752,6 +798,20 @@ export default function CRMDashboard() {
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
                               </svg>
                             </button>
+                            {isAdmin && (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  deleteRepairOrder(ro.id)
+                                }}
+                                className="text-red-600 hover:text-red-800"
+                                title="Delete (Admin Only)"
+                              >
+                                <svg className="w-5 h-5 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                </svg>
+                              </button>
+                            )}
                           </td>
                         </tr>
                       ))
@@ -854,6 +914,20 @@ export default function CRMDashboard() {
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                               </svg>
                             </button>
+                            {isAdmin && (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  deleteRepairOrder(ro.id)
+                                }}
+                                className="text-red-600 hover:text-red-800"
+                                title="Delete (Admin Only)"
+                              >
+                                <svg className="w-5 h-5 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                </svg>
+                              </button>
+                            )}
                           </td>
                         </tr>
                       ))

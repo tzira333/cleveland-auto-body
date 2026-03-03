@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { createBrowserClient } from '@supabase/ssr'
 import { useRouter } from 'next/navigation'
 import ConvertToROButton from './appointments/ConvertToROButton'
+import { useAuth } from '@/hooks/useAuth'
 
 interface AppointmentFile {
   id: string
@@ -46,6 +47,7 @@ interface Appointment {
 
 export default function StaffDashboard() {
   const router = useRouter()
+  const { user, isAdmin } = useAuth()
   const [appointments, setAppointments] = useState<Appointment[]>([])
   const [archivedAppointments, setArchivedAppointments] = useState<Appointment[]>([])
   const [showArchived, setShowArchived] = useState(false)
@@ -75,20 +77,22 @@ export default function StaffDashboard() {
       setLoading(true)
       setError('')
 
-      // Fetch active (non-archived) appointments
+      // Fetch active (non-archived, non-deleted) appointments
       const { data, error: fetchError } = await supabase
         .from('appointments')
         .select('*')
         .or('archived.is.null,archived.eq.false')
+        .is('deleted_at', null)
         .order('created_at', { ascending: false })
 
       if (fetchError) throw fetchError
 
-      // Fetch archived appointments
+      // Fetch archived (non-deleted) appointments
       const { data: archivedData, error: archivedError } = await supabase
         .from('appointments')
         .select('*')
         .eq('archived', true)
+        .is('deleted_at', null)
         .order('archived_at', { ascending: false })
 
       if (archivedError) throw archivedError
@@ -316,6 +320,37 @@ export default function StaffDashboard() {
     }
   }
 
+  const deleteAppointment = async (appointmentId: string) => {
+    if (!isAdmin) {
+      alert('Only administrators can delete appointments')
+      return
+    }
+
+    if (!confirm('⚠️ PERMANENTLY DELETE this appointment?\n\nThis action CANNOT be undone!\n\nAll associated files and notes will also be deleted.')) return
+
+    try {
+      const response = await fetch(`/api/appointments/${appointmentId}`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ deleted_by: user?.email || 'unknown' })
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        alert(data.error || 'Failed to delete appointment')
+        return
+      }
+
+      alert('Appointment deleted successfully')
+      fetchAppointments()
+      setSelectedAppointment(null)
+    } catch (error) {
+      console.error('Error deleting appointment:', error)
+      alert('Failed to delete appointment')
+    }
+  }
+
   const updateAppointmentStatus = async (id: string, newStatus: string) => {
     try {
       const { error: updateError } = await supabase
@@ -334,45 +369,6 @@ export default function StaffDashboard() {
     } catch (err) {
       console.error('Error updating appointment:', err)
       alert('Failed to update appointment status')
-    }
-  }
-
-  const deleteAppointment = async (id: string) => {
-    // Confirm deletion
-    const confirmed = window.confirm(
-      'Are you sure you want to delete this appointment? This action cannot be undone.'
-    )
-
-    if (!confirmed) return
-
-    try {
-      // Delete associated files first (cascade should handle this, but explicit is safer)
-      const { error: filesError } = await supabase
-        .from('appointment_files')
-        .delete()
-        .eq('appointment_id', id)
-
-      if (filesError) {
-        console.warn('Error deleting appointment files:', filesError)
-      }
-
-      // Delete the appointment
-      const { error: deleteError } = await supabase
-        .from('appointments')
-        .delete()
-        .eq('id', id)
-
-      if (deleteError) throw deleteError
-
-      // Show success message
-      alert('Appointment deleted successfully')
-
-      // Refresh appointments list
-      fetchAppointments()
-      setSelectedAppointment(null)
-    } catch (err) {
-      console.error('Error deleting appointment:', err)
-      alert('Failed to delete appointment. Please try again.')
     }
   }
 
@@ -703,15 +699,17 @@ export default function StaffDashboard() {
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
                             </svg>
                           </button>
-                          <button
-                            onClick={() => deleteAppointment(appointment.id)}
-                            className="text-red-600 hover:text-red-900 p-1 rounded hover:bg-red-50 transition-colors"
-                            title="Delete appointment"
-                          >
-                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                            </svg>
-                          </button>
+                          {isAdmin && (
+                            <button
+                              onClick={() => deleteAppointment(appointment.id)}
+                              className="text-red-600 hover:text-red-900 p-1 rounded hover:bg-red-50 transition-colors"
+                              title="Delete appointment (Admin only)"
+                            >
+                              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                              </svg>
+                            </button>
+                          )}
                         </div>
                       </td>
                     </tr>

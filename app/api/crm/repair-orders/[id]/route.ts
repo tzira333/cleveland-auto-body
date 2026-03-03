@@ -168,15 +168,65 @@ export async function DELETE(
 ) {
   try {
     const { id } = params;
-    const { searchParams } = new URL(request.url);
-    const archived_by = searchParams.get('archived_by') || 'Staff';
+    const body = await request.json();
+    const { action, deleted_by, archived_by } = body;
 
+    // If action is 'delete', perform soft delete (admin only)
+    if (action === 'delete') {
+      if (!deleted_by) {
+        return NextResponse.json(
+          { error: 'deleted_by is required for delete action' },
+          { status: 400 }
+        );
+      }
+
+      // Verify user is admin
+      const { data: staffUser } = await supabase
+        .from('staff_users')
+        .select('role, email')
+        .eq('email', deleted_by)
+        .single();
+
+      if (!staffUser || (staffUser.role !== 'admin' && staffUser.email !== 'domesticandforeignab@gmail.com')) {
+        return NextResponse.json(
+          { error: 'Unauthorized. Admin access required for deletion.' },
+          { status: 403 }
+        );
+      }
+
+      // Soft delete
+      const { data, error } = await supabase
+        .from('crm_repair_orders')
+        .update({
+          deleted_at: new Date().toISOString(),
+          deleted_by: deleted_by
+        })
+        .eq('id', id)
+        .select()
+        .single();
+
+      if (error) {
+        console.error('Error soft deleting repair order:', error);
+        return NextResponse.json(
+          { error: 'Failed to delete repair order', details: error.message },
+          { status: 500 }
+        );
+      }
+
+      return NextResponse.json({
+        success: true,
+        message: 'Repair order deleted successfully',
+        repair_order: data
+      });
+    }
+
+    // Default: Archive (existing functionality)
     const { data, error } = await supabase
       .from('crm_repair_orders')
       .update({
         archived: true,
         archived_at: new Date().toISOString(),
-        archived_by
+        archived_by: archived_by || 'Staff'
       })
       .eq('id', id)
       .select()
