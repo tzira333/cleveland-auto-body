@@ -5,9 +5,11 @@ import { createBrowserClient } from '@supabase/ssr'
 import { useRouter } from 'next/navigation'
 import CreateRepairOrderForm from './CreateRepairOrderForm'
 import EditRepairOrderModal from './EditRepairOrderModal'
+import StatusMetricsTab from './StatusMetricsTab'
+import CountdownColumn from './CountdownColumn'
 import { useAuth } from '@/hooks/useAuth'
 
-type ViewType = 'dashboard' | 'repair-orders' | 'archived-ros' | 'customers' | 'parts' | 'reports'
+type ViewType = 'dashboard' | 'repair-orders' | 'archived-ros' | 'status-metrics' | 'customers' | 'parts' | 'reports'
 
 interface RepairOrder {
   id: string
@@ -339,9 +341,10 @@ export default function CRMDashboard() {
               { id: 'dashboard' as ViewType, label: 'Dashboard', icon: '📊' },
               { id: 'repair-orders' as ViewType, label: 'Repair Orders', icon: '📋' },
               { id: 'archived-ros' as ViewType, label: 'Archived ROs', icon: '📦' },
+              { id: 'status-metrics' as ViewType, label: 'Status Metrics', icon: '📈' },
               { id: 'customers' as ViewType, label: 'Customers', icon: '👥' },
               { id: 'parts' as ViewType, label: 'Parts', icon: '🔧' },
-              { id: 'reports' as ViewType, label: 'Reports', icon: '📈' }
+              { id: 'reports' as ViewType, label: 'Reports', icon: '📄' }
             ].map((item) => (
               <button
                 key={item.id}
@@ -453,19 +456,20 @@ export default function CRMDashboard() {
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Priority</th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date Received</th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Est. Completion</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Countdown</th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
                     {loading ? (
                       <tr>
-                        <td colSpan={8} className="px-6 py-8 text-center text-gray-500">
+                        <td colSpan={9} className="px-6 py-8 text-center text-gray-500">
                           Loading...
                         </td>
                       </tr>
                     ) : repairOrders.length === 0 ? (
                       <tr>
-                        <td colSpan={8} className="px-6 py-8 text-center text-gray-500">
+                        <td colSpan={9} className="px-6 py-8 text-center text-gray-500">
                           No repair orders yet. Create your first repair order to get started.
                         </td>
                       </tr>
@@ -506,6 +510,13 @@ export default function CRMDashboard() {
                             {ro.estimated_completion
                               ? new Date(ro.estimated_completion).toLocaleDateString()
                               : 'Not set'}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <CountdownColumn
+                              absoluteEndDate={ro.absolute_end_date || null}
+                              createdAt={ro.date_received}
+                              roNumber={ro.ro_number}
+                            />
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm">
                             <button
@@ -707,19 +718,20 @@ export default function CRMDashboard() {
                           )}
                         </div>
                       </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Countdown</th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
                     {loading ? (
                       <tr>
-                        <td colSpan={8} className="px-6 py-8 text-center text-gray-500">
+                        <td colSpan={9} className="px-6 py-8 text-center text-gray-500">
                           Loading...
                         </td>
                       </tr>
                     ) : getFilteredAndSortedOrders(repairOrders).length === 0 ? (
                       <tr>
-                        <td colSpan={8} className="px-6 py-8 text-center text-gray-500">
+                        <td colSpan={9} className="px-6 py-8 text-center text-gray-500">
                           {repairOrders.length === 0 
                             ? 'No repair orders yet. Click "Create New Repair Order" to get started.'
                             : 'No repair orders match your filters.'}
@@ -772,6 +784,13 @@ export default function CRMDashboard() {
                             ) : (
                               <span className="text-gray-400">Not set</span>
                             )}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <CountdownColumn
+                              absoluteEndDate={ro.absolute_end_date || null}
+                              createdAt={ro.date_received}
+                              roNumber={ro.ro_number}
+                            />
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm space-x-2">
                             <button
@@ -939,7 +958,11 @@ export default function CRMDashboard() {
           </div>
         )}
 
-        {currentView !== 'dashboard' && currentView !== 'repair-orders' && currentView !== 'archived-ros' && (
+        {currentView === 'status-metrics' && (
+          <StatusMetricsTab />
+        )}
+
+        {currentView !== 'dashboard' && currentView !== 'repair-orders' && currentView !== 'archived-ros' && currentView !== 'status-metrics' && (
           <div className="bg-white rounded-lg shadow p-12">
             <div className="text-center text-gray-500">
               <svg className="w-24 h-24 mx-auto text-gray-300 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
