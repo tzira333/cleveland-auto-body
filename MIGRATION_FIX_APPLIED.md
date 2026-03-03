@@ -1,52 +1,53 @@
-# Migration Fix Applied - Column Name Correction
+# Migration Fixes Applied - All Issues Resolved
 
-## Issue Encountered
+## Issues Encountered & Fixed
+
+### Issue 1: Column Name Mismatch (FIXED)
 ```
 Error: Failed to run sql query: 
 ERROR: 42703: column ro.customer_name does not exist 
 LINE 186: ro.customer_name,
 ```
 
-## Root Cause
-The migration file referenced columns that don't exist in the `crm_repair_orders` table:
+**Root Cause:**
+The migration referenced columns that don't exist in `crm_repair_orders`:
 - ❌ `customer_name` (doesn't exist)
 - ❌ `vehicle_info` (doesn't exist)
 
-**Actual schema has:**
-- ✅ `customer_first_name`, `customer_last_name` (separate fields)
-- ✅ `vehicle_year`, `vehicle_make`, `vehicle_model` (separate fields)
+**Fix Applied (Commit `8b6a411`):**
+```sql
+-- Changed to concatenate existing columns
+CONCAT(ro.customer_first_name, ' ', ro.customer_last_name) as customer_name,
+CONCAT(ro.vehicle_year, ' ', ro.vehicle_make, ' ', ro.vehicle_model) as vehicle_info
+```
 
 ---
 
-## Fix Applied
-
-**File:** `migrations/add_status_tracking_and_metrics.sql`
-
-**Changed:**
-```sql
--- BEFORE (incorrect)
-CREATE OR REPLACE VIEW vw_repair_order_status_durations AS
-SELECT 
-  ro.id,
-  ro.ro_number,
-  ro.customer_name,        ← Column doesn't exist
-  ro.vehicle_info,          ← Column doesn't exist
-  ...
-
--- AFTER (corrected)
-CREATE OR REPLACE VIEW vw_repair_order_status_durations AS
-SELECT 
-  ro.id,
-  ro.ro_number,
-  CONCAT(ro.customer_first_name, ' ', ro.customer_last_name) as customer_name,
-  CONCAT(ro.vehicle_year, ' ', ro.vehicle_make, ' ', ro.vehicle_model) as vehicle_info,
-  ...
+### Issue 2: EXTRACT Function Type Mismatch (FIXED)
+```
+Error: Failed to run sql query: 
+ERROR: 42883: function pg_catalog.extract(unknown, integer) does not exist
+LINE 218: EXTRACT(DAY FROM (ro.absolute_end_date - NOW()::DATE))::INTEGER
+HINT: No function matches the given name and argument types. You might need to add explicit type casts.
 ```
 
-**Result:**
-- Creates `customer_name` by concatenating first and last name
-- Creates `vehicle_info` by concatenating year, make, and model
-- View now works correctly with actual table structure
+**Root Cause:**
+PostgreSQL DATE - DATE subtraction already returns INTEGER (days), not INTERVAL.
+Using `EXTRACT()` on an INTEGER caused type error.
+
+**Fix Applied (Commit `c01a07b`):**
+```sql
+-- BEFORE (incorrect)
+EXTRACT(DAY FROM (ro.absolute_end_date - NOW()::DATE))::INTEGER
+
+-- AFTER (corrected) 
+(ro.absolute_end_date - NOW()::DATE)::INTEGER
+```
+
+**Explanation:**
+- `DATE - DATE` = INTEGER (number of days difference)
+- `EXTRACT(DAY FROM INTERVAL)` = works with INTERVAL, not INTEGER
+- Solution: Remove EXTRACT() wrapper, cast result directly to INTEGER
 
 ---
 
@@ -148,12 +149,14 @@ WHERE tgname = 'trigger_log_status_change';
 ## Git History
 
 ```
-8b6a411 - Fix view column names to match actual crm_repair_orders schema
+c01a07b - Fix EXTRACT function error in countdown calculation ⭐ LATEST FIX
+8b6a411 - Fix view column names to match actual crm_repair_orders schema ⭐ FIX
+8741f28 - Add migration fix documentation
 ec7c67a - Add deployment guide for status tracking system
 9889b0d - Add comprehensive status tracking and countdown system
 ```
 
-**Latest commit:** `8b6a411` (contains the fix)  
+**Latest commit:** `c01a07b` (contains all fixes)  
 **Repository:** https://github.com/tzira333/cleveland-auto-body  
 **Branch:** main  
 
@@ -161,8 +164,9 @@ ec7c67a - Add deployment guide for status tracking system
 
 ## Summary
 
-✅ **Migration file corrected and pushed to GitHub**  
-✅ **Commit:** `8b6a411`  
+✅ **Both migration errors fixed and pushed to GitHub**  
+✅ **Fix 1:** Column concatenation for customer_name and vehicle_info (Commit `8b6a411`)  
+✅ **Fix 2:** EXTRACT function removed for DATE subtraction (Commit `c01a07b`)  
 ✅ **Ready to run in Supabase**  
 
 **Action Required:**
@@ -174,5 +178,6 @@ ec7c67a - Add deployment guide for status tracking system
 ---
 
 **Date:** March 3, 2026  
-**Status:** ✅ Fixed and deployed to GitHub  
-**Next:** Run corrected migration in Supabase
+**Status:** ✅ All fixes applied and deployed to GitHub  
+**Latest Commit:** `c01a07b`  
+**Next:** Run fully corrected migration in Supabase
