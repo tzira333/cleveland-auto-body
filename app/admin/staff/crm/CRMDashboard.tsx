@@ -15,6 +15,7 @@ interface RepairOrder {
   priority: string
   date_received: string
   estimated_completion: string
+  absolute_end_date?: string
   customer_id: string
   vehicle_id: string
   damage_description: string
@@ -22,6 +23,7 @@ interface RepairOrder {
   archived_at?: string
   customer_first_name?: string
   customer_last_name?: string
+  customer_phone?: string
   vehicle_year?: string
   vehicle_make?: string
   vehicle_model?: string
@@ -36,6 +38,17 @@ export default function CRMDashboard() {
   const [showCreateROForm, setShowCreateROForm] = useState(false)
   const [selectedRO, setSelectedRO] = useState<RepairOrder | null>(null)
   const [showEditModal, setShowEditModal] = useState(false)
+  
+  // Sorting and filtering state
+  const [sortField, setSortField] = useState<keyof RepairOrder>('date_received')
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc')
+  const [filters, setFilters] = useState({
+    roNumber: '',
+    customerName: '',
+    vehicleInfo: '',
+    status: '',
+    priority: ''
+  })
 
   const supabase = createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -154,6 +167,73 @@ export default function CRMDashboard() {
       alert('Failed to restore repair order')
     }
   }
+
+  // Sort repair orders
+  const handleSort = (field: keyof RepairOrder) => {
+    if (sortField === field) {
+      // Toggle direction if same field
+      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc')
+    } else {
+      // New field, default to ascending
+      setSortField(field)
+      setSortDirection('asc')
+    }
+  }
+
+  // Filter and sort repair orders
+  const getFilteredAndSortedOrders = (orders: RepairOrder[]) => {
+    // Apply filters
+    let filtered = orders.filter(ro => {
+      const matchesRONumber = !filters.roNumber || 
+        ro.ro_number.toLowerCase().includes(filters.roNumber.toLowerCase())
+      
+      const matchesCustomer = !filters.customerName || 
+        `${ro.customer_first_name} ${ro.customer_last_name}`.toLowerCase().includes(filters.customerName.toLowerCase())
+      
+      const matchesVehicle = !filters.vehicleInfo || 
+        `${ro.vehicle_year} ${ro.vehicle_make} ${ro.vehicle_model}`.toLowerCase().includes(filters.vehicleInfo.toLowerCase())
+      
+      const matchesStatus = !filters.status || ro.status === filters.status
+      
+      const matchesPriority = !filters.priority || ro.priority === filters.priority
+
+      return matchesRONumber && matchesCustomer && matchesVehicle && matchesStatus && matchesPriority
+    })
+
+    // Apply sorting
+    filtered.sort((a, b) => {
+      let aVal = a[sortField]
+      let bVal = b[sortField]
+
+      // Handle undefined/null values
+      if (aVal === undefined || aVal === null) aVal = ''
+      if (bVal === undefined || bVal === null) bVal = ''
+
+      // Convert to strings for comparison
+      const aStr = String(aVal).toLowerCase()
+      const bStr = String(bVal).toLowerCase()
+
+      if (sortDirection === 'asc') {
+        return aStr < bStr ? -1 : aStr > bStr ? 1 : 0
+      } else {
+        return aStr > bStr ? -1 : aStr < bStr ? 1 : 0
+      }
+    })
+
+    return filtered
+  }
+
+  // Clear all filters
+  const clearFilters = () => {
+    setFilters({
+      roNumber: '',
+      customerName: '',
+      vehicleInfo: '',
+      status: '',
+      priority: ''
+    })
+  }
+
 
   const handleEditRO = (ro: RepairOrder) => {
     setSelectedRO(ro)
@@ -437,36 +517,173 @@ export default function CRMDashboard() {
               </div>
             )}
 
+            {/* Filters */}
+            <div className="bg-white rounded-lg shadow p-4 mb-4">
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-sm font-semibold text-gray-700">Filters</h3>
+                <button
+                  onClick={clearFilters}
+                  className="text-xs text-blue-600 hover:text-blue-800"
+                >
+                  Clear All
+                </button>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-3">
+                <input
+                  type="text"
+                  placeholder="RO Number..."
+                  value={filters.roNumber}
+                  onChange={(e) => setFilters({...filters, roNumber: e.target.value})}
+                  className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500"
+                />
+                <input
+                  type="text"
+                  placeholder="Customer Name..."
+                  value={filters.customerName}
+                  onChange={(e) => setFilters({...filters, customerName: e.target.value})}
+                  className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500"
+                />
+                <input
+                  type="text"
+                  placeholder="Vehicle..."
+                  value={filters.vehicleInfo}
+                  onChange={(e) => setFilters({...filters, vehicleInfo: e.target.value})}
+                  className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500"
+                />
+                <select
+                  value={filters.status}
+                  onChange={(e) => setFilters({...filters, status: e.target.value})}
+                  className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="">All Statuses</option>
+                  <option value="intake">Intake</option>
+                  <option value="insurance">Insurance</option>
+                  <option value="estimate_approval">Estimate Approval</option>
+                  <option value="blueprinting">Blueprinting</option>
+                  <option value="parts_ordered">Parts Ordered</option>
+                  <option value="in_repair">In Repair</option>
+                  <option value="painting">Painting</option>
+                  <option value="quality_control">Quality Control</option>
+                  <option value="ready_pickup">Ready Pickup</option>
+                  <option value="completed">Completed</option>
+                </select>
+                <select
+                  value={filters.priority}
+                  onChange={(e) => setFilters({...filters, priority: e.target.value})}
+                  className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="">All Priorities</option>
+                  <option value="low">Low</option>
+                  <option value="medium">Medium</option>
+                  <option value="high">High</option>
+                  <option value="urgent">Urgent</option>
+                </select>
+              </div>
+            </div>
+
             {/* Repair Orders List */}
             <div className="bg-white rounded-lg shadow">
               <div className="overflow-x-auto">
                 <table className="min-w-full divide-y divide-gray-200">
                   <thead className="bg-gray-50">
                     <tr>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">RO#</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Customer</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Vehicle</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Priority</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
+                      <th 
+                        className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100"
+                        onClick={() => handleSort('ro_number')}
+                      >
+                        <div className="flex items-center gap-1">
+                          RO#
+                          {sortField === 'ro_number' && (
+                            <span>{sortDirection === 'asc' ? '↑' : '↓'}</span>
+                          )}
+                        </div>
+                      </th>
+                      <th 
+                        className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100"
+                        onClick={() => handleSort('customer_first_name')}
+                      >
+                        <div className="flex items-center gap-1">
+                          Customer
+                          {sortField === 'customer_first_name' && (
+                            <span>{sortDirection === 'asc' ? '↑' : '↓'}</span>
+                          )}
+                        </div>
+                      </th>
+                      <th 
+                        className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100"
+                        onClick={() => handleSort('vehicle_make')}
+                      >
+                        <div className="flex items-center gap-1">
+                          Vehicle
+                          {sortField === 'vehicle_make' && (
+                            <span>{sortDirection === 'asc' ? '↑' : '↓'}</span>
+                          )}
+                        </div>
+                      </th>
+                      <th 
+                        className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100"
+                        onClick={() => handleSort('status')}
+                      >
+                        <div className="flex items-center gap-1">
+                          Status
+                          {sortField === 'status' && (
+                            <span>{sortDirection === 'asc' ? '↑' : '↓'}</span>
+                          )}
+                        </div>
+                      </th>
+                      <th 
+                        className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100"
+                        onClick={() => handleSort('priority')}
+                      >
+                        <div className="flex items-center gap-1">
+                          Priority
+                          {sortField === 'priority' && (
+                            <span>{sortDirection === 'asc' ? '↑' : '↓'}</span>
+                          )}
+                        </div>
+                      </th>
+                      <th 
+                        className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100"
+                        onClick={() => handleSort('date_received')}
+                      >
+                        <div className="flex items-center gap-1">
+                          Date
+                          {sortField === 'date_received' && (
+                            <span>{sortDirection === 'asc' ? '↑' : '↓'}</span>
+                          )}
+                        </div>
+                      </th>
+                      <th 
+                        className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100"
+                        onClick={() => handleSort('absolute_end_date')}
+                      >
+                        <div className="flex items-center gap-1">
+                          End Date
+                          {sortField === 'absolute_end_date' && (
+                            <span>{sortDirection === 'asc' ? '↑' : '↓'}</span>
+                          )}
+                        </div>
+                      </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
                     {loading ? (
                       <tr>
-                        <td colSpan={7} className="px-6 py-8 text-center text-gray-500">
+                        <td colSpan={8} className="px-6 py-8 text-center text-gray-500">
                           Loading...
                         </td>
                       </tr>
-                    ) : repairOrders.length === 0 ? (
+                    ) : getFilteredAndSortedOrders(repairOrders).length === 0 ? (
                       <tr>
-                        <td colSpan={7} className="px-6 py-8 text-center text-gray-500">
-                          No repair orders yet. Click "Create New Repair Order" to get started.
+                        <td colSpan={8} className="px-6 py-8 text-center text-gray-500">
+                          {repairOrders.length === 0 
+                            ? 'No repair orders yet. Click "Create New Repair Order" to get started.'
+                            : 'No repair orders match your filters.'}
                         </td>
                       </tr>
                     ) : (
-                      repairOrders.map((ro) => (
+                      getFilteredAndSortedOrders(repairOrders).map((ro) => (
                         <tr 
                           key={ro.id} 
                           onClick={() => handleEditRO(ro)}
@@ -497,6 +714,21 @@ export default function CRMDashboard() {
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                             {new Date(ro.date_received).toLocaleDateString()}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm">
+                            {ro.absolute_end_date ? (
+                              <span className={
+                                new Date(ro.absolute_end_date) < new Date() 
+                                  ? 'text-red-600 font-semibold'
+                                  : new Date(ro.absolute_end_date) < new Date(Date.now() + 3*24*60*60*1000)
+                                  ? 'text-orange-600 font-semibold'
+                                  : 'text-gray-500'
+                              }>
+                                {new Date(ro.absolute_end_date).toLocaleDateString()}
+                              </span>
+                            ) : (
+                              <span className="text-gray-400">Not set</span>
+                            )}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm space-x-2">
                             <button

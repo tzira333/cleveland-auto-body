@@ -27,6 +27,7 @@ export default function EditRepairOrderModal({
     status: repairOrder.status || 'intake',
     priority: repairOrder.priority || 'medium',
     estimated_completion: repairOrder.estimated_completion?.split('T')[0] || '',
+    absolute_end_date: repairOrder.absolute_end_date?.split('T')[0] || '',
     damage_description: repairOrder.damage_description || '',
     estimate_amount: repairOrder.estimate_amount || ''
   })
@@ -305,6 +306,24 @@ export default function EditRepairOrderModal({
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               disabled={saving}
             />
+          </div>
+
+          {/* Absolute End Date */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Absolute End Date
+              <span className="text-xs text-gray-500 ml-1">(Hard Deadline)</span>
+            </label>
+            <input
+              type="date"
+              value={formData.absolute_end_date}
+              onChange={(e) => setFormData({ ...formData, absolute_end_date: e.target.value })}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500"
+              disabled={saving}
+            />
+            <p className="text-xs text-gray-500 mt-1">
+              This is the hard deadline by which the repair must be completed
+            </p>
           </div>
 
           {/* Damage Description */}
