@@ -183,8 +183,8 @@ CREATE OR REPLACE VIEW vw_repair_order_status_durations AS
 SELECT 
   ro.id,
   ro.ro_number,
-  ro.customer_name,
-  ro.vehicle_info,
+  CONCAT(ro.customer_first_name, ' ', ro.customer_last_name) as customer_name,
+  CONCAT(ro.vehicle_year, ' ', ro.vehicle_make, ' ', ro.vehicle_model) as vehicle_info,
   ro.status as current_status,
   ro.absolute_end_date,
   ro.created_at,
