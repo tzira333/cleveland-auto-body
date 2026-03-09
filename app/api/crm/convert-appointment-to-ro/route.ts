@@ -317,10 +317,14 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // 9. Update appointment status to mark as converted
+    // 9. Archive appointment (mark as converted to RO)
     await supabase
       .from('appointments')
       .update({
+        archived: true,
+        archived_at: new Date().toISOString(),
+        archived_by: 'Staff',
+        archived_reason: `Converted to Repair Order ${roNumber}`,
         staff_notes: `Converted to Repair Order ${roNumber}`,
         updated_at: new Date().toISOString()
       })

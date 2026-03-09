@@ -1,5 +1,5 @@
-import { createClient } from '@supabase/supabase-js';
 import { NextRequest, NextResponse } from 'next/server';
+import { createClient } from '@supabase/supabase-js';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
@@ -14,51 +14,50 @@ const supabase = createClient(supabaseUrl, supabaseServiceKey, {
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-// POST - Archive an appointment
+/**
+ * POST /api/appointments/archive
+ * Archives an appointment (manually by staff)
+ */
 export async function POST(request: NextRequest) {
   try {
-    const { appointment_id, archived_by } = await request.json();
+    const { appointment_id, archived_by, archived_reason } = await request.json();
 
     if (!appointment_id) {
       return NextResponse.json(
-        { error: 'Appointment ID is required' },
+        { error: 'appointment_id is required' },
         { status: 400 }
       );
     }
 
-    const { data, error } = await supabase
+    // Update the appointment to archived
+    const { data: archivedAppointment, error: updateError } = await supabase
       .from('appointments')
       .update({
         archived: true,
         archived_at: new Date().toISOString(),
-        archived_by: archived_by || 'Staff'
+        archived_by: archived_by || 'Staff',
+        archived_reason: archived_reason || 'Manually archived by staff',
+        updated_at: new Date().toISOString()
       })
       .eq('id', appointment_id)
       .select()
       .single();
 
-    if (error) {
-      console.error('Error archiving appointment:', error);
+    if (updateError) {
       return NextResponse.json(
-        { error: 'Failed to archive appointment', details: error.message },
+        { error: 'Failed to archive appointment', details: updateError },
         { status: 500 }
-      );
-    }
-
-    if (!data) {
-      return NextResponse.json(
-        { error: 'Appointment not found' },
-        { status: 404 }
       );
     }
 
     return NextResponse.json({
       success: true,
-      message: 'Appointment archived successfully',
-      appointment: data
+      appointment: archivedAppointment,
+      message: 'Appointment archived successfully'
     });
+
   } catch (error: any) {
-    console.error('Error in archive appointment:', error);
+    console.error('Error archiving appointment:', error);
     return NextResponse.json(
       { error: 'Internal server error', details: error.message },
       { status: 500 }
@@ -66,51 +65,50 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// PUT - Unarchive an appointment
-export async function PUT(request: NextRequest) {
+/**
+ * DELETE /api/appointments/archive (Unarchive)
+ * Unarchives an appointment
+ */
+export async function DELETE(request: NextRequest) {
   try {
     const { appointment_id } = await request.json();
 
     if (!appointment_id) {
       return NextResponse.json(
-        { error: 'Appointment ID is required' },
+        { error: 'appointment_id is required' },
         { status: 400 }
       );
     }
 
-    const { data, error } = await supabase
+    // Update the appointment to unarchive
+    const { data: unarchivedAppointment, error: updateError } = await supabase
       .from('appointments')
       .update({
         archived: false,
         archived_at: null,
-        archived_by: null
+        archived_by: null,
+        archived_reason: null,
+        updated_at: new Date().toISOString()
       })
       .eq('id', appointment_id)
       .select()
       .single();
 
-    if (error) {
-      console.error('Error unarchiving appointment:', error);
+    if (updateError) {
       return NextResponse.json(
-        { error: 'Failed to unarchive appointment', details: error.message },
+        { error: 'Failed to unarchive appointment', details: updateError },
         { status: 500 }
-      );
-    }
-
-    if (!data) {
-      return NextResponse.json(
-        { error: 'Appointment not found' },
-        { status: 404 }
       );
     }
 
     return NextResponse.json({
       success: true,
-      message: 'Appointment restored successfully',
-      appointment: data
+      appointment: unarchivedAppointment,
+      message: 'Appointment unarchived successfully'
     });
+
   } catch (error: any) {
-    console.error('Error in unarchive appointment:', error);
+    console.error('Error unarchiving appointment:', error);
     return NextResponse.json(
       { error: 'Internal server error', details: error.message },
       { status: 500 }

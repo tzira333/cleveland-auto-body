@@ -121,6 +121,8 @@ export async function POST(request: NextRequest) {
     });
 
     // Insert appointment record
+    // New appointments from public forms are 'inquiry' by default
+    // Staff can later confirm them to 'confirmed'
     const { data: appointment, error: appointmentError } = await supabase
       .from('appointments')
       .insert([
@@ -134,6 +136,8 @@ export async function POST(request: NextRequest) {
           appointment_date,
           appointment_time,
           status,
+          appointment_type: 'inquiry', // Default to service inquiry
+          archived: false,
         },
       ])
       .select()

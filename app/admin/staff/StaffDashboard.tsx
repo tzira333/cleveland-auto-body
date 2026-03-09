@@ -38,10 +38,13 @@ interface Appointment {
   appointment_date: string
   appointment_time: string
   status: string
+  appointment_type: 'inquiry' | 'confirmed' // NEW: distinguish inquiries from confirmed appointments
   created_at: string
   updated_at: string
   archived?: boolean
   archived_at?: string
+  archived_by?: string
+  archived_reason?: string
   files?: AppointmentFile[]
   notes?: AppointmentNote[]
 }
@@ -51,7 +54,7 @@ export default function StaffDashboard() {
   const { user, isAdmin } = useAuth()
   const [appointments, setAppointments] = useState<Appointment[]>([])
   const [archivedAppointments, setArchivedAppointments] = useState<Appointment[]>([])
-  const [showArchived, setShowArchived] = useState(false)
+  const [activeView, setActiveView] = useState<'inquiries' | 'confirmed' | 'archived'>('inquiries')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null)
@@ -270,58 +273,6 @@ export default function StaffDashboard() {
     }
   }
 
-  const archiveAppointment = async (appointmentId: string) => {
-    if (!confirm('Archive this appointment? It will be moved to the archived section.')) return
-
-    try {
-      const response = await fetch('/api/appointments/archive', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ appointment_id: appointmentId })
-      })
-
-      const data = await response.json()
-
-      if (!response.ok) {
-        alert(data.error || 'Failed to archive appointment')
-        return
-      }
-
-      alert('Appointment archived successfully')
-      fetchAppointments()
-      setSelectedAppointment(null)
-    } catch (error) {
-      console.error('Error archiving appointment:', error)
-      alert('Failed to archive appointment')
-    }
-  }
-
-  const unarchiveAppointment = async (appointmentId: string) => {
-    if (!confirm('Restore this appointment from archive?')) return
-
-    try {
-      const response = await fetch('/api/appointments/archive', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ appointment_id: appointmentId })
-      })
-
-      const data = await response.json()
-
-      if (!response.ok) {
-        alert(data.error || 'Failed to restore appointment')
-        return
-      }
-
-      alert('Appointment restored successfully')
-      fetchAppointments()
-      setSelectedAppointment(null)
-    } catch (error) {
-      console.error('Error restoring appointment:', error)
-      alert('Failed to restore appointment')
-    }
-  }
-
   const deleteAppointment = async (appointmentId: string) => {
     if (!isAdmin) {
       alert('Only administrators can delete appointments')
@@ -353,6 +304,96 @@ export default function StaffDashboard() {
     }
   }
 
+  // Confirm an inquiry and convert it to a confirmed appointment
+  const confirmAppointment = async (appointmentId: string, date?: string, time?: string) => {
+    if (!confirm('Confirm this service inquiry as an appointment?')) return
+
+    try {
+      const response = await fetch('/api/appointments/confirm', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          appointment_id: appointmentId,
+          appointment_date: date,
+          appointment_time: time,
+          staff_notes: `Confirmed by ${user?.email || 'staff'}`
+        })
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        alert(data.error || 'Failed to confirm appointment')
+        return
+      }
+
+      alert('Appointment confirmed successfully!')
+      fetchAppointments()
+      setSelectedAppointment(null)
+    } catch (error) {
+      console.error('Error confirming appointment:', error)
+      alert('Failed to confirm appointment')
+    }
+  }
+
+  // Archive an appointment (manual)
+  const archiveAppointment = async (appointmentId: string, reason?: string) => {
+    if (!confirm('Archive this appointment?')) return
+
+    try {
+      const response = await fetch('/api/appointments/archive', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          appointment_id: appointmentId,
+          archived_by: user?.email || 'staff',
+          archived_reason: reason || 'Manually archived by staff'
+        })
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        alert(data.error || 'Failed to archive appointment')
+        return
+      }
+
+      alert('Appointment archived successfully')
+      fetchAppointments()
+      setSelectedAppointment(null)
+    } catch (error) {
+      console.error('Error archiving appointment:', error)
+      alert('Failed to archive appointment')
+    }
+  }
+
+  // Unarchive an appointment
+  const unarchiveAppointment = async (appointmentId: string) => {
+    if (!confirm('Restore this appointment?')) return
+
+    try {
+      const response = await fetch('/api/appointments/archive', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ appointment_id: appointmentId })
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        alert(data.error || 'Failed to unarchive appointment')
+        return
+      }
+
+      alert('Appointment restored successfully')
+      fetchAppointments()
+      setSelectedAppointment(null)
+    } catch (error) {
+      console.error('Error unarchiving appointment:', error)
+      alert('Failed to unarchive appointment')
+    }
+  }
+
   const updateAppointmentStatus = async (id: string, newStatus: string) => {
     try {
       const { error: updateError } = await supabase
@@ -374,16 +415,36 @@ export default function StaffDashboard() {
     }
   }
 
-  const filteredAppointments = appointments.filter(apt => {
+  // Filter appointments based on active view and search query
+  const serviceInquiries = appointments.filter(apt => 
+    apt.appointment_type === 'inquiry' && !apt.archived
+  )
+  
+  const confirmedAppointments = appointments.filter(apt => 
+    apt.appointment_type === 'confirmed' && !apt.archived
+  )
+
+  const filteredAppointments = (() => {
+    let source: Appointment[] = []
+    
+    if (activeView === 'inquiries') {
+      source = serviceInquiries
+    } else if (activeView === 'confirmed') {
+      source = confirmedAppointments
+    } else if (activeView === 'archived') {
+      source = archivedAppointments
+    }
+    
+    // Apply search filter
     const query = searchQuery.toLowerCase()
-    return (
+    return source.filter(apt => 
       apt.customer_name.toLowerCase().includes(query) ||
       apt.customer_phone.includes(query) ||
       apt.customer_email.toLowerCase().includes(query) ||
       apt.vehicle_info.toLowerCase().includes(query) ||
       apt.status.toLowerCase().includes(query)
     )
-  })
+  })()
 
   const getStatusBadgeColor = (status: string) => {
     switch (status.toLowerCase()) {
