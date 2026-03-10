@@ -9,6 +9,10 @@
 2. Copy and paste the SQL below:
 
 ```sql
+-- CRITICAL: Add staff_notes column first (essential for tracking staff actions)
+ALTER TABLE appointments 
+ADD COLUMN IF NOT EXISTS staff_notes TEXT;
+
 -- Add appointment_type column
 ALTER TABLE appointments 
 ADD COLUMN IF NOT EXISTS appointment_type TEXT DEFAULT 'inquiry' 

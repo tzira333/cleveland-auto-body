@@ -2,12 +2,19 @@
 -- This migration adds appointment_type to distinguish between service inquiries and confirmed appointments
 -- and adds archive functionality for appointments converted to repair orders
 
+-- CRITICAL: Add staff_notes column if it doesn't exist
+-- This column is essential for tracking staff actions and notes on appointments
+ALTER TABLE appointments 
+ADD COLUMN IF NOT EXISTS staff_notes TEXT;
+
+COMMENT ON COLUMN appointments.staff_notes IS 'Internal notes added by staff members (e.g., confirmation details, follow-up actions)';
+
 -- 1. Add appointment_type column to distinguish Service Inquiries from Confirmed Appointments
 ALTER TABLE appointments 
 ADD COLUMN IF NOT EXISTS appointment_type TEXT DEFAULT 'inquiry' 
 CHECK (appointment_type IN ('inquiry', 'confirmed'));
 
--- 2. Add archive columns for appointments
+-- 3. Add archive columns for appointments
 ALTER TABLE appointments 
 ADD COLUMN IF NOT EXISTS archived BOOLEAN DEFAULT FALSE;
 

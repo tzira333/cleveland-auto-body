@@ -22,7 +22,7 @@ export async function POST(request: NextRequest) {
   try {
     const { appointment_id, appointment_date, appointment_time, staff_notes } = await request.json();
 
-    console.log('Confirm appointment request:', { appointment_id, appointment_date, appointment_time });
+    console.log('Confirm appointment request:', { appointment_id, appointment_date, appointment_time, has_staff_notes: !!staff_notes });
 
     if (!appointment_id) {
       return NextResponse.json(
@@ -46,10 +46,11 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    console.log('Found appointment:', appointment);
+    console.log('Found appointment:', { id: appointment.id, type: appointment.appointment_type, archived: appointment.archived });
 
     // Check if appointment_type column exists (for backward compatibility)
     const hasAppointmentType = 'appointment_type' in appointment;
+    const hasStaffNotes = 'staff_notes' in appointment;
     
     if (hasAppointmentType) {
       // Check if it's already confirmed
@@ -80,10 +81,26 @@ export async function POST(request: NextRequest) {
       updateData.appointment_type = 'confirmed';
     }
 
+    // Add staff_notes if the column exists and notes are provided
+    if (hasStaffNotes && staff_notes) {
+      // Append to existing staff notes if any
+      const existingNotes = appointment.staff_notes || '';
+      const timestamp = new Date().toLocaleString('en-US', { 
+        timeZone: 'America/New_York',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+      updateData.staff_notes = existingNotes 
+        ? `${existingNotes}\n\n[${timestamp}] ${staff_notes}`
+        : `[${timestamp}] ${staff_notes}`;
+    }
+
     // Update date/time if provided
     if (appointment_date) updateData.appointment_date = appointment_date;
     if (appointment_time) updateData.appointment_time = appointment_time;
-    if (staff_notes) updateData.staff_notes = staff_notes;
 
     console.log('Updating appointment with:', updateData);
 

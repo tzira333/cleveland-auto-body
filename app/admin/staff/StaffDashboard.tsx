@@ -318,7 +318,7 @@ export default function StaffDashboard() {
           appointment_id: appointmentId,
           appointment_date: date,
           appointment_time: time,
-          staff_notes: `Confirmed by ${user?.email || 'staff'}`
+          staff_notes: `Confirmed by ${user?.email || 'staff member'}`
         })
       })
 
@@ -379,7 +379,10 @@ export default function StaffDashboard() {
       const response = await fetch('/api/appointments/archive', {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ appointment_id: appointmentId })
+        body: JSON.stringify({ 
+          appointment_id: appointmentId,
+          staff_email: user?.email || 'staff member'
+        })
       })
 
       const data = await response.json()
