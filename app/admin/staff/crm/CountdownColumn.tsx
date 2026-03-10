@@ -105,20 +105,22 @@ export default function CountdownColumn({
           ${shouldPulse ? 'animate-pulse' : ''}
           transition-all duration-200
         `}
-        title={`Absolute End Date: ${new Date(absoluteEndDate).toLocaleDateString()}`}
+        title={absoluteEndDate ? `Absolute End Date: ${new Date(absoluteEndDate).toLocaleDateString()}` : 'No end date set'}
       >
         {getIcon()}
         <span>{getText()}</span>
       </div>
       
       {/* Show date */}
-      <div className="text-xs text-gray-500">
-        {new Date(absoluteEndDate).toLocaleDateString('en-US', {
-          month: 'short',
-          day: 'numeric',
-          year: 'numeric'
-        })}
-      </div>
+      {absoluteEndDate && (
+        <div className="text-xs text-gray-500">
+          {new Date(absoluteEndDate).toLocaleDateString('en-US', {
+            month: 'short',
+            day: 'numeric',
+            year: 'numeric'
+          })}
+        </div>
+      )}
     </div>
   )
 }

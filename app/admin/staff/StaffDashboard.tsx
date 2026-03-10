@@ -522,27 +522,26 @@ export default function StaffDashboard() {
         </div>
 
         {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
           <div className="bg-white p-4 rounded-lg shadow">
-            <div className="text-sm text-gray-600">Total Appointments</div>
-            <div className="text-2xl font-bold text-gray-900">{appointments.length}</div>
-          </div>
-          <div className="bg-white p-4 rounded-lg shadow">
-            <div className="text-sm text-gray-600">Pending</div>
+            <div className="text-sm text-gray-600">Service Inquiries</div>
             <div className="text-2xl font-bold text-yellow-600">
-              {appointments.filter(a => a.status === 'pending').length}
+              {serviceInquiries.length}
             </div>
           </div>
           <div className="bg-white p-4 rounded-lg shadow">
-            <div className="text-sm text-gray-600">Confirmed</div>
+            <div className="text-sm text-gray-600">Confirmed Appointments</div>
             <div className="text-2xl font-bold text-blue-600">
-              {appointments.filter(a => a.status === 'confirmed').length}
+              {confirmedAppointments.length}
             </div>
           </div>
           <div className="bg-white p-4 rounded-lg shadow">
-            <div className="text-sm text-gray-600">In Progress</div>
-            <div className="text-2xl font-bold text-purple-600">
-              {appointments.filter(a => a.status === 'in-progress').length}
+            <div className="text-sm text-gray-600">Today's Appointments</div>
+            <div className="text-2xl font-bold text-green-600">
+              {confirmedAppointments.filter(a => {
+                const today = new Date().toISOString().split('T')[0]
+                return a.appointment_date === today
+              }).length}
             </div>
           </div>
           <div className="bg-white p-4 rounded-lg shadow">
@@ -557,24 +556,49 @@ export default function StaffDashboard() {
         <div className="mb-6 border-b border-gray-200">
           <nav className="-mb-px flex space-x-8">
             <button
-              onClick={() => setShowArchived(false)}
+              onClick={() => setActiveView('inquiries')}
               className={`${
-                !showArchived
-                  ? 'border-blue-500 text-blue-600'
+                activeView === 'inquiries'
+                  ? 'border-yellow-500 text-yellow-600'
                   : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
               } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors`}
             >
-              Active Appointments ({appointments.length})
+              <span className="flex items-center">
+                <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
+                </svg>
+                Service Inquiries ({serviceInquiries.length})
+              </span>
             </button>
             <button
-              onClick={() => setShowArchived(true)}
+              onClick={() => setActiveView('confirmed')}
               className={`${
-                showArchived
+                activeView === 'confirmed'
                   ? 'border-blue-500 text-blue-600'
                   : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
               } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors`}
             >
-              Archived Appointments ({archivedAppointments.length})
+              <span className="flex items-center">
+                <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                </svg>
+                Confirmed Appointments ({confirmedAppointments.length})
+              </span>
+            </button>
+            <button
+              onClick={() => setActiveView('archived')}
+              className={`${
+                activeView === 'archived'
+                  ? 'border-gray-500 text-gray-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors`}
+            >
+              <span className="flex items-center">
+                <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
+                </svg>
+                Archived ({archivedAppointments.length})
+              </span>
             </button>
           </nav>
         </div>
@@ -583,97 +607,25 @@ export default function StaffDashboard() {
         <div className="bg-white rounded-lg shadow overflow-hidden">
           <div className="px-6 py-4 border-b border-gray-200">
             <h2 className="text-lg font-semibold text-gray-900">
-              {showArchived ? 'Archived Appointments' : 'Active Appointments'} ({showArchived ? archivedAppointments.length : filteredAppointments.length})
+              {activeView === 'inquiries' && `Service Inquiries (${filteredAppointments.length})`}
+              {activeView === 'confirmed' && `Confirmed Appointments (${filteredAppointments.length})`}
+              {activeView === 'archived' && `Archived (${filteredAppointments.length})`}
             </h2>
           </div>
 
           {loading ? (
             <div className="p-8 text-center text-gray-500">
-              Loading appointments...
+              Loading...
             </div>
           ) : error ? (
             <div className="p-8 text-center text-red-600">
               {error}
             </div>
-          ) : showArchived ? (
-            archivedAppointments.length === 0 ? (
-              <div className="p-8 text-center text-gray-500">
-                No archived appointments found
-              </div>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-gray-200">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Customer
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Contact
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Service
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Status
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Archived Date
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Actions
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody className="bg-white divide-y divide-gray-200">
-                    {archivedAppointments.map((appointment) => (
-                      <tr key={appointment.id} className="hover:bg-gray-50">
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="text-sm font-medium text-gray-900">
-                            {appointment.customer_name}
-                          </div>
-                        </td>
-                        <td className="px-6 py-4">
-                          <div className="text-sm text-gray-900">{appointment.customer_phone}</div>
-                          <div className="text-xs text-gray-500">{appointment.customer_email}</div>
-                        </td>
-                        <td className="px-6 py-4">
-                          <span className="text-sm text-gray-900">{appointment.service_type}</span>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${getStatusBadgeColor(appointment.status)}`}>
-                            {appointment.status}
-                          </span>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                          {appointment.archived_at ? formatDate(appointment.archived_at) : 'N/A'}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm space-x-2">
-                          <button
-                            onClick={() => {
-                              setSelectedAppointment(appointment)
-                              fetchAppointmentNotes(appointment.id)
-                            }}
-                            className="text-blue-600 hover:text-blue-800 font-medium"
-                          >
-                            View
-                          </button>
-                          <button
-                            onClick={() => unarchiveAppointment(appointment.id)}
-                            className="text-green-600 hover:text-green-800 font-medium"
-                          >
-                            Restore
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )
           ) : filteredAppointments.length === 0 ? (
             <div className="p-8 text-center text-gray-500">
-              No appointments found
+              {activeView === 'inquiries' && 'No service inquiries found'}
+              {activeView === 'confirmed' && 'No confirmed appointments found'}
+              {activeView === 'archived' && 'No archived appointments found'}
             </div>
           ) : (
             <div className="overflow-x-auto">
@@ -711,7 +663,14 @@ export default function StaffDashboard() {
                           {appointment.customer_name}
                         </div>
                         <div className="text-xs text-gray-500">
-                          Created: {formatDate(appointment.created_at)}
+                          {appointment.appointment_type === 'inquiry' ? (
+                            <span className="text-yellow-600 font-medium">📩 Inquiry</span>
+                          ) : (
+                            <span className="text-blue-600 font-medium">📅 Confirmed</span>
+                          )}
+                          {appointment.archived && (
+                            <span className="ml-2 text-gray-500">🗄️ Archived</span>
+                          )}
                         </div>
                       </td>
                       <td className="px-6 py-4">
@@ -719,7 +678,7 @@ export default function StaffDashboard() {
                         <div className="text-xs text-gray-500">{appointment.customer_email}</div>
                       </td>
                       <td className="px-6 py-4">
-                        <div className="text-sm text-gray-900">{appointment.vehicle_info}</div>
+                        <div className="text-sm text-gray-900">{appointment.vehicle_info || 'N/A'}</div>
                       </td>
                       <td className="px-6 py-4">
                         <div className="text-sm text-gray-900 capitalize">
@@ -727,8 +686,14 @@ export default function StaffDashboard() {
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm text-gray-900">{formatDate(appointment.appointment_date)}</div>
-                        <div className="text-xs text-gray-500">{formatTime(appointment.appointment_time)}</div>
+                        {appointment.appointment_date ? (
+                          <>
+                            <div className="text-sm text-gray-900">{formatDate(appointment.appointment_date)}</div>
+                            <div className="text-xs text-gray-500">{formatTime(appointment.appointment_time)}</div>
+                          </>
+                        ) : (
+                          <div className="text-xs text-gray-400 italic">Not scheduled</div>
+                        )}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <span className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full border ${getStatusBadgeColor(appointment.status)}`}>
@@ -737,45 +702,68 @@ export default function StaffDashboard() {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm">
                         <div className="flex items-center gap-2">
+                          {/* View Details Button */}
                           <button
                             onClick={() => {
                               setSelectedAppointment(appointment)
                               fetchAppointmentNotes(appointment.id)
                             }}
-                            className="text-blue-600 hover:text-blue-900 font-medium"
+                            className="text-blue-600 hover:text-blue-900 font-medium px-2 py-1 rounded hover:bg-blue-50"
+                            title="View details"
                           >
-                            View Details
+                            View
                           </button>
-                          <button
-                            onClick={() => setEditingAppointment(appointment)}
-                            className="text-green-600 hover:text-green-900 p-1 rounded hover:bg-green-50 transition-colors"
-                            title="Edit appointment"
-                          >
-                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                            </svg>
-                          </button>
-                          {appointment.status === 'completed' && (
+
+                          {/* Confirm Button - Only for inquiries */}
+                          {appointment.appointment_type === 'inquiry' && !appointment.archived && (
+                            <button
+                              onClick={() => confirmAppointment(appointment.id, appointment.appointment_date, appointment.appointment_time)}
+                              className="text-white bg-blue-600 hover:bg-blue-700 font-medium px-3 py-1 rounded transition-colors"
+                              title="Confirm this inquiry as an appointment"
+                            >
+                              Confirm
+                            </button>
+                          )}
+
+                          {/* Convert to RO Button - Only for confirmed appointments */}
+                          {appointment.appointment_type === 'confirmed' && !appointment.archived && (
                             <ConvertToROButton 
                               appointmentId={appointment.id}
                               appointmentStatus={appointment.status}
                               onSuccess={fetchAppointments}
                             />
                           )}
-                          <button
-                            onClick={() => archiveAppointment(appointment.id)}
-                            className="text-gray-600 hover:text-gray-900 p-1 rounded hover:bg-gray-50 transition-colors"
-                            title="Archive appointment"
-                          >
-                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
-                            </svg>
-                          </button>
+
+                          {/* Archive Button - For all non-archived */}
+                          {!appointment.archived && (
+                            <button
+                              onClick={() => archiveAppointment(appointment.id, 'Manually archived by staff')}
+                              className="text-red-600 hover:text-red-800 p-1 rounded hover:bg-red-50 transition-colors"
+                              title="Archive"
+                            >
+                              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
+                              </svg>
+                            </button>
+                          )}
+
+                          {/* Unarchive Button - Only for archived */}
+                          {appointment.archived && (
+                            <button
+                              onClick={() => unarchiveAppointment(appointment.id)}
+                              className="text-green-600 hover:text-green-800 font-medium px-2 py-1 rounded hover:bg-green-50"
+                              title="Restore from archive"
+                            >
+                              Unarchive
+                            </button>
+                          )}
+
+                          {/* Delete Button - Admin only */}
                           {isAdmin && (
                             <button
                               onClick={() => deleteAppointment(appointment.id)}
-                              className="text-red-600 hover:text-red-900 p-1 rounded hover:bg-red-50 transition-colors"
-                              title="Delete appointment (Admin only)"
+                              className="text-gray-400 hover:text-red-600 p-1 rounded hover:bg-gray-100 transition-colors"
+                              title="Permanently delete"
                             >
                               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
