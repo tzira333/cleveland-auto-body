@@ -43,11 +43,11 @@ export async function GET(
         customer_phone: appointment.customer_phone,
         appointment_date: appointment.appointment_date,
         appointment_time: appointment.appointment_time,
-        duration_minutes: appointment.duration_minutes,
+        duration_minutes: appointment.duration_minutes || null, // Optional field
         service_type: appointment.service_type,
         status: appointment.status,
         notes: appointment.notes, // Customer's own notes
-        appointment_type: appointment.appointment_type,
+        appointment_type: appointment.appointment_type || 'inquiry', // Default if missing
         created_at: appointment.created_at,
         updated_at: appointment.updated_at,
         shared_notes: appointment.shared_notes || [], // Staff notes marked as customer_visible
