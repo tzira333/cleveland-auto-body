@@ -62,17 +62,17 @@ export default function Header() {
                 </div>
               </Link>
 
-              {/* Phone Number - LARGER - Desktop Only */}
+              {/* Phone Number - Desktop Only */}
               <a
                 href={phoneHref}
-                className="hidden lg:flex items-center space-x-3 text-red-700 hover:text-red-800 transition-colors group"
+                className="hidden lg:flex items-center space-x-2 text-red-700 hover:text-red-800 transition-colors group"
               >
-                <div className="bg-red-100 p-3 rounded-full group-hover:bg-red-200 transition-colors">
-                  <Phone className="h-7 w-7" />
+                <div className="bg-red-100 p-2.5 rounded-full group-hover:bg-red-200 transition-colors">
+                  <Phone className="h-6 w-6" />
                 </div>
                 <div>
                   <div className="text-xs text-gray-600 font-medium">Call Us Now</div>
-                  <div className="text-2xl font-bold">{phoneDisplay}</div>
+                  <div className="text-lg font-bold">{phoneDisplay}</div>
                 </div>
               </a>
             </div>
