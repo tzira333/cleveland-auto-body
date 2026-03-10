@@ -39,24 +39,32 @@ export default function Hero() {
         <div className="max-w-6xl mx-auto text-center">
           {/* CTA Buttons */}
           <div className="flex flex-col sm:flex-row gap-4 justify-center mb-12">
-            {/* Schedule Estimate */}
+            {/* Customer Portal - Order 1 on mobile, Order 2 on desktop (before Request Tow) */}
+            <Link
+              href="/portal"
+              className="order-1 sm:order-2 px-6 py-3 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 transition-all shadow-md"
+            >
+              Customer Portal
+            </Link>
+
+            {/* Schedule Estimate - Order 2 on mobile, Order 1 on desktop */}
             <Link
               href="/schedule"
-              className="px-6 py-3 border-2 border-red-600 text-red-600 font-semibold rounded-lg hover:bg-red-600 hover:text-white transition-all"
+              className="order-2 sm:order-1 px-6 py-3 border-2 border-red-600 text-red-600 font-semibold rounded-lg hover:bg-red-600 hover:text-white transition-all"
             >
               Schedule Estimate
             </Link>
 
-            {/* Request Tow Service */}
+            {/* Request Tow Service - Order 3 on both mobile and desktop */}
             <Link
               href="/tow-request"
-              className="px-6 py-3 border-2 border-red-600 text-red-600 font-semibold rounded-lg hover:bg-red-600 hover:text-white transition-all"
+              className="order-3 px-6 py-3 border-2 border-red-600 text-red-600 font-semibold rounded-lg hover:bg-red-600 hover:text-white transition-all"
             >
               Request Tow Service
             </Link>
 
-            {/* Express Care Request with Tooltip */}
-            <div className="relative inline-block">
+            {/* Express Care Request with Tooltip - Order 4 on both mobile and desktop */}
+            <div className="relative inline-block order-4">
               <Link
                 href="/repair-request"
                 className="inline-block px-6 py-3 bg-red-600 text-white font-semibold rounded-lg hover:bg-red-700 transition-all shadow-lg"
