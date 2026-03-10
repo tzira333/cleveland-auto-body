@@ -309,6 +309,8 @@ export default function StaffDashboard() {
     if (!confirm('Confirm this service inquiry as an appointment?')) return
 
     try {
+      console.log('Confirming appointment:', { appointmentId, date, time })
+      
       const response = await fetch('/api/appointments/confirm', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -321,9 +323,11 @@ export default function StaffDashboard() {
       })
 
       const data = await response.json()
+      console.log('Confirm response:', { status: response.status, data })
 
       if (!response.ok) {
-        alert(data.error || 'Failed to confirm appointment')
+        console.error('Failed to confirm:', data)
+        alert(`Failed to confirm appointment: ${data.error || 'Unknown error'}\nDetails: ${JSON.stringify(data.details || {})}`)
         return
       }
 
@@ -332,7 +336,7 @@ export default function StaffDashboard() {
       setSelectedAppointment(null)
     } catch (error) {
       console.error('Error confirming appointment:', error)
-      alert('Failed to confirm appointment')
+      alert(`Failed to confirm appointment: ${error}`)
     }
   }
 
