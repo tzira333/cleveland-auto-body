@@ -1,4 +1,4 @@
-// API endpoint for staff to create notes with customer visibility control
+// API endpoint for staff to create repair order notes with customer visibility control
 
 import { createClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
@@ -9,39 +9,39 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
 
     const {
-      appointment_id,
+      repair_order_id,
       note_text,
       customer_visible = false, // Default to staff-only
       created_by
     } = body
 
     // Validation
-    if (!appointment_id || !note_text || !created_by) {
+    if (!repair_order_id || !note_text || !created_by) {
       return NextResponse.json(
-        { error: 'Missing required fields: appointment_id, note_text, created_by' },
+        { error: 'Missing required fields: repair_order_id, note_text, created_by' },
         { status: 400 }
       )
     }
 
-    // Verify appointment exists
-    const { data: appointment, error: appointmentError } = await supabase
-      .from('appointments')
+    // Verify repair order exists
+    const { data: repairOrder, error: roError } = await supabase
+      .from('repair_orders')
       .select('id')
-      .eq('id', appointment_id)
+      .eq('id', repair_order_id)
       .single()
 
-    if (appointmentError || !appointment) {
+    if (roError || !repairOrder) {
       return NextResponse.json(
-        { error: 'Appointment not found' },
+        { error: 'Repair order not found' },
         { status: 404 }
       )
     }
 
     // Insert note
     const { data: note, error: noteError } = await supabase
-      .from('appointment_notes')
+      .from('repair_order_notes')
       .insert({
-        appointment_id,
+        repair_order_id,
         note_text,
         customer_visible,
         created_by
@@ -50,7 +50,7 @@ export async function POST(request: NextRequest) {
       .single()
 
     if (noteError) {
-      console.error('Error creating note:', noteError)
+      console.error('Error creating repair order note:', noteError)
       return NextResponse.json(
         { error: 'Failed to create note' },
         { status: 500 }
@@ -63,7 +63,7 @@ export async function POST(request: NextRequest) {
     })
 
   } catch (error) {
-    console.error('Error in appointment notes POST:', error)
+    console.error('Error in repair order notes POST:', error)
     return NextResponse.json(
       { error: 'Failed to create note' },
       { status: 500 }
@@ -71,28 +71,28 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// GET all notes for an appointment (staff view)
+// GET all notes for a repair order (staff view)
 export async function GET(request: NextRequest) {
   try {
     const supabase = createClient()
     const { searchParams } = new URL(request.url)
-    const appointmentId = searchParams.get('appointment_id')
+    const repairOrderId = searchParams.get('repair_order_id')
 
-    if (!appointmentId) {
+    if (!repairOrderId) {
       return NextResponse.json(
-        { error: 'appointment_id query parameter is required' },
+        { error: 'repair_order_id query parameter is required' },
         { status: 400 }
       )
     }
 
     const { data: notes, error } = await supabase
-      .from('appointment_notes')
+      .from('repair_order_notes')
       .select('*')
-      .eq('appointment_id', appointmentId)
+      .eq('repair_order_id', repairOrderId)
       .order('created_at', { ascending: false })
 
     if (error) {
-      console.error('Error fetching notes:', error)
+      console.error('Error fetching repair order notes:', error)
       return NextResponse.json(
         { error: 'Failed to fetch notes' },
         { status: 500 }
@@ -102,7 +102,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ notes })
 
   } catch (error) {
-    console.error('Error in appointment notes GET:', error)
+    console.error('Error in repair order notes GET:', error)
     return NextResponse.json(
       { error: 'Failed to fetch notes' },
       { status: 500 }
