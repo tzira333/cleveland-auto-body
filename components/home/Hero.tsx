@@ -14,8 +14,8 @@ export default function Hero() {
         <h1 className="text-3xl md:text-4xl lg:text-5xl font-bold mb-2">
           Expert Auto Body & Collision Repair in Cleveland
         </h1>
-        <p className="text-lg md:text-xl text-red-100">
-          Over 40 years of experience serving domestic and foreign vehicles
+        <p className="text-base md:text-lg lg:text-xl text-red-100 max-w-5xl mx-auto px-4">
+          Over 40 years of experience servicing and repairing Domestic and Foreign vehicles of all types (Classic Cars, Sports Cars, Luxury Cars, Pick-up Trucks, SUVs, Vans, RVs, Tractor Trailers, and all types of Commercial Vehicles and Equipment) - Specializing in Full Collision Services, Custom Painting, Fabrication and Restorations.
         </p>
       </div>
 
