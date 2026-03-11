@@ -22,7 +22,9 @@ interface AppointmentNote {
   id: string
   appointment_id: string
   note_text: string
+  customer_visible: boolean // NEW: Track if note is shared with customer
   staff_name: string
+  created_by: string // NEW: Staff email or 'customer'
   created_at: string
   updated_at: string
 }
@@ -62,6 +64,7 @@ export default function StaffDashboard() {
   const [searchQuery, setSearchQuery] = useState('')
   const [appointmentNotes, setAppointmentNotes] = useState<AppointmentNote[]>([])
   const [newNoteText, setNewNoteText] = useState('')
+  const [newNoteCustomerVisible, setNewNoteCustomerVisible] = useState(false) // NEW: Share with Customer checkbox state
   const [editingNoteId, setEditingNoteId] = useState<string | null>(null)
   const [editingNoteText, setEditingNoteText] = useState('')
   const [loadingNotes, setLoadingNotes] = useState(false)
@@ -198,7 +201,9 @@ export default function StaffDashboard() {
         body: JSON.stringify({
           appointment_id: selectedAppointment.id,
           note_text: newNoteText.trim(),
-          staff_name: 'Staff' // You can get this from auth context
+          customer_visible: newNoteCustomerVisible, // NEW: Include share flag
+          created_by: user?.email || 'Staff', // NEW: Track who created the note
+          staff_name: 'Staff' // Keep for backwards compatibility
         })
       })
 
@@ -207,6 +212,7 @@ export default function StaffDashboard() {
       if (response.ok) {
         setAppointmentNotes([data.note, ...appointmentNotes])
         setNewNoteText('')
+        setNewNoteCustomerVisible(false) // Reset checkbox after adding note
       } else {
         alert('Failed to add note: ' + (data.error || 'Unknown error'))
       }
@@ -966,7 +972,31 @@ export default function StaffDashboard() {
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 min-h-[100px] resize-y"
                     disabled={savingNote}
                   />
-                  <div className="mt-2 flex justify-end">
+                  
+                  {/* Share with Customer Checkbox */}
+                  <div className="mt-3 flex items-center gap-2 bg-white p-3 rounded-lg border border-blue-200">
+                    <input
+                      type="checkbox"
+                      id="shareWithCustomer"
+                      checked={newNoteCustomerVisible}
+                      onChange={(e) => setNewNoteCustomerVisible(e.target.checked)}
+                      className="w-5 h-5 text-blue-600 border-gray-300 rounded focus:ring-2 focus:ring-blue-500 cursor-pointer"
+                      disabled={savingNote}
+                    />
+                    <label
+                      htmlFor="shareWithCustomer"
+                      className="flex items-center gap-2 text-sm font-medium text-gray-700 cursor-pointer select-none"
+                    >
+                      <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                      </svg>
+                      Share with Customer
+                      <span className="text-xs text-gray-500">(Customer will see this note in their portal)</span>
+                    </label>
+                  </div>
+
+                  <div className="mt-3 flex justify-end">
                     <button
                       onClick={addAppointmentNote}
                       disabled={!newNoteText.trim() || savingNote}
@@ -1016,13 +1046,23 @@ export default function StaffDashboard() {
                   ) : (
                     <div className="max-h-96 overflow-y-auto space-y-3">
                       {appointmentNotes.map((note) => (
-                        <div key={note.id} className="bg-white border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
+                        <div key={note.id} className={`bg-white border rounded-lg p-4 hover:shadow-md transition-shadow ${note.customer_visible ? 'border-blue-300 bg-blue-50/30' : 'border-gray-200'}`}>
                           <div className="flex justify-between items-start mb-2">
                             <div className="flex items-center gap-2">
                               <svg className="w-4 h-4 text-blue-600" fill="currentColor" viewBox="0 0 20 20">
                                 <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" />
                               </svg>
                               <span className="text-sm font-medium text-gray-900">{note.staff_name}</span>
+                              {/* Visual indicator for shared notes */}
+                              {note.customer_visible && (
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-blue-100 text-blue-700 text-xs font-medium rounded-full border border-blue-200">
+                                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                                  </svg>
+                                  Shared with Customer
+                                </span>
+                              )}
                             </div>
                             <div className="flex items-center gap-2">
                               {editingNoteId !== note.id && (

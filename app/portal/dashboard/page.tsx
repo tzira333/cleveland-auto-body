@@ -5,6 +5,8 @@ import { createBrowserClient } from '@supabase/ssr'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { formatPhoneDisplay } from '@/lib/utils/phone'
+import EditAppointmentModal from '@/components/portal/EditAppointmentModal'
+import AccountCreationNotification from '@/components/portal/AccountCreationNotification'
 
 interface CustomerUser {
   id: string
@@ -35,6 +37,7 @@ export default function CustomerDashboard() {
   const [appointments, setAppointments] = useState<Appointment[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [editingAppointment, setEditingAppointment] = useState<Appointment | null>(null) // NEW: Track appointment being edited
   const router = useRouter()
 
   const supabase = createBrowserClient(
@@ -107,6 +110,18 @@ export default function CustomerDashboard() {
     router.refresh()
   }
 
+  const handleEditAppointment = (appointment: Appointment) => {
+    setEditingAppointment(appointment)
+  }
+
+  const handleSaveAppointment = async () => {
+    // Reload appointments after edit
+    if (customer) {
+      await loadAppointments(customer.id)
+    }
+    setEditingAppointment(null)
+  }
+
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'completed':
@@ -165,6 +180,9 @@ export default function CustomerDashboard() {
   return (
     <div className="min-h-screen bg-gradient-to-b from-white to-gray-50 py-8 px-4">
       <div className="max-w-7xl mx-auto">
+        {/* Account Creation Notification */}
+        <AccountCreationNotification />
+
         {/* Header */}
         <div className="bg-white rounded-lg shadow-lg p-6 mb-8">
           <div className="flex items-center justify-between">
@@ -273,11 +291,26 @@ export default function CustomerDashboard() {
                         Appointment ID: {appointment.id.slice(0, 8)}
                       </p>
                     </div>
-                    <span
-                      className={`px-4 py-2 rounded-full text-sm font-semibold border ${getStatusColor(appointment.status)}`}
-                    >
-                      {appointment.status.toUpperCase()}
-                    </span>
+                    <div className="flex items-center gap-2">
+                      <span
+                        className={`px-4 py-2 rounded-full text-sm font-semibold border ${getStatusColor(appointment.status)}`}
+                      >
+                        {appointment.status.toUpperCase()}
+                      </span>
+                      {/* Edit Button */}
+                      {['pending', 'confirmed'].includes(appointment.status) && (
+                        <button
+                          onClick={() => handleEditAppointment(appointment)}
+                          className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-blue-700 transition-colors flex items-center gap-1"
+                          title="Edit appointment"
+                        >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                          </svg>
+                          Edit
+                        </button>
+                      )}
+                    </div>
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -336,6 +369,15 @@ export default function CustomerDashboard() {
           </p>
         </div>
       </div>
+
+      {/* Edit Appointment Modal */}
+      {editingAppointment && (
+        <EditAppointmentModal
+          appointment={editingAppointment}
+          onClose={() => setEditingAppointment(null)}
+          onSave={handleSaveAppointment}
+        />
+      )}
     </div>
   )
 }
